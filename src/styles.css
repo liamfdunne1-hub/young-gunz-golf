@@ -1,0 +1,105 @@
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Outfit:wght@300;400;500;600;700&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+
+  --color-navy: #0b1f33;
+  --color-navy-2: #12283f;
+  --color-navy-3: #1a3654;
+  --color-ink: #0e1520;
+  --color-fairway: #1b4d3e;
+  --color-fairway-2: #2f6b4f;
+  --color-cream: #f4efe4;
+  --color-cream-2: #e7dfcf;
+  --color-gold: #c4a35a;
+  --color-gold-2: #d4b56c;
+  --color-orange: #d46a2e;
+  --color-paper: #f7f3ea;
+  --color-muted: #6d7a86;
+  --color-line: color-mix(in oklab, #f4efe4 16%, transparent);
+  --color-danger: #b42318;
+  --color-ok: #1b7a4a;
+
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 28px;
+
+  --shadow-panel: 0 24px 60px -32px rgb(11 31 51 / 0.55);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: var(--color-navy);
+    color: var(--color-cream);
+  }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    font-family: var(--font-sans);
+    background: var(--color-navy);
+    color: var(--color-cream);
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    text-wrap: balance;
+    letter-spacing: -0.03em;
+    font-weight: 600;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  ::selection {
+    background: var(--color-gold);
+    color: var(--color-navy);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.gold-rule {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-gold), transparent);
+}
+
+.hero-scrim {
+  background:
+    linear-gradient(180deg, rgb(11 31 51 / 0.5) 0%, rgb(11 31 51 / 0.62) 42%, rgb(11 31 51 / 0.96) 100%),
+    linear-gradient(90deg, rgb(11 31 51 / 0.72), transparent 58%);
+}
+
+.panel {
+  background: var(--color-navy-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+}
+
+.ticker {
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}

@@ -1,0 +1,45 @@
+# dependencies
+node_modules/
+.node_modules.lock
+
+# secrets and local env
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
+!.env.example
+
+# build output
+dist/
+.next/
+.vercel/
+.output/
+.nitro/
+.tanstack/
+
+# OS junk
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# keys and credentials
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+id_rsa
+id_rsa.pub
+*.secret
+credentials.json
+service-account*.json
+
+# platform / local-only
+.grok/
+.project_id
+screenshots/
+artifacts/
+*.log
+.pglite/

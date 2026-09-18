@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Young Gunz">
+  <rect width="32" height="32" rx="7" fill="#0B1F33"/>
+  <path
+    d="M16 3.6 L26.6 8.1 V16.8 C26.6 23.2 21.6 27.6 16 29.5 C10.4 27.6 5.4 23.2 5.4 16.8 V8.1 Z"
+    fill="#1B4D3E"
+    stroke="#C4A35A"
+    stroke-width="1.55"
+    stroke-linejoin="round"
+  />
+  <circle cx="16" cy="15.2" r="6.35" fill="#F4EFE4"/>
+  <circle cx="14.25" cy="13.55" r="1.15" fill="#0B1F33" opacity="0.32"/>
+  <circle cx="18.15" cy="13.35" r="0.95" fill="#0B1F33" opacity="0.22"/>
+  <circle cx="16.15" cy="17.15" r="1.05" fill="#0B1F33" opacity="0.22"/>
+</svg>
