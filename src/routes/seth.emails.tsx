@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { getEmails, getMailSettings, saveMailSettings, sendBroadcast, sendTestEmail } from "@/lib/server/api";
+import { clearMailKeys, clearPlaceholderPlayerEmails } from "@/lib/server/mail-admin";
 import { useMeQuery } from "@/lib/hooks";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/input";
@@ -145,6 +146,29 @@ function MailHook({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const strip = useMutation({
+    mutationFn: () => clearPlaceholderPlayerEmails(),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["trip"] });
+      qc.invalidateQueries({ queryKey: ["emails"] });
+      toast(`Cleared ${res.players} fake addresses. Stopped ${res.emails} queued fakes.`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const clear = useMutation({
+    mutationFn: () => clearMailKeys(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mail-settings"] });
+      qc.invalidateQueries({ queryKey: ["emails"] });
+      setApiKey("");
+      setSmtpPass("");
+      setXaiKey("");
+      toast("Keys cleared. Emails will stay queued until you save a key again.");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const test = useMutation({
     mutationFn: () => sendTestEmail({ data: { to: testTo.trim() } }),
     onSuccess: () => {
@@ -163,7 +187,7 @@ function MailHook({
         </h2>
         <p className="text-sm text-muted">
           {settings?.connected
-            ? `${settings.provider === "smtp" ? "SMTP" : "Resend"} · From ${settings.from}${settings.queued ? ` · ${settings.queued} still queued` : ""}`
+            ? `${settings.provider === "smtp" ? "SMTP" : "Resend"} \u00b7 From ${settings.from}${settings.queued ? ` \u00b7 ${settings.queued} still queued` : ""}`
             : `${settings?.queued ?? 0} emails waiting. Paste a free Resend API key, or a Gmail app password.`}
         </p>
       </div>
@@ -185,37 +209,19 @@ function MailHook({
           <span className="text-xs text-muted">App password. smtp.gmail.com:465.</span>
         </button>
       </div>
-      {provider === "resend" ? (
-        <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
-          <li>
-            Create a free account at{" "}
-            <a className="text-gold underline" href="https://resend.com" target="_blank" rel="noreferrer">
-              resend.com
-            </a>
-          </li>
-          <li>Add a domain you own, or use their onboarding address for tests.</li>
-          <li>API Keys → Create. Paste it here. From must match that domain.</li>
-        </ol>
-      ) : (
-        <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
-          <li>Gmail: turn on 2-Step Verification, then create an App Password.</li>
-          <li>Host smtp.gmail.com, port 465, username your Gmail, password the 16-character app password.</li>
-          <li>From must be that same Gmail address.</li>
-        </ol>
-      )}
       <div>
         <Label>From</Label>
         <Input value={from} onChange={(e) => setFrom(e.target.value)} placeholder='Young Gunz <golf@yourdomain.com>' />
       </div>
       {provider === "resend" ? (
         <div>
-          <Label>Resend API key {settings?.keyHint ? `(saved …${settings.keyHint})` : ""}</Label>
+          <Label>Resend API key {settings?.keyHint ? `(saved \u2026${settings.keyHint})` : ""}</Label>
           <Input
             type="password"
             autoComplete="off"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            placeholder={settings?.hasKey ? "Leave blank to keep the saved key" : "re_••••"}
+            placeholder={settings?.hasKey ? "Leave blank to keep the saved key" : "re_\u2022\u2022\u2022\u2022"}
           />
         </div>
       ) : (
@@ -236,41 +242,51 @@ function MailHook({
           </div>
           <div>
             <Label>Password {settings?.hasSmtpPass ? "(saved)" : ""}</Label>
-            <Input
-              type="password"
-              autoComplete="off"
-              value={smtpPass}
-              onChange={(e) => setSmtpPass(e.target.value)}
-              placeholder={settings?.hasSmtpPass ? "Leave blank to keep the saved password" : "App password"}
-            />
+            <Input type="password" autoComplete="off" value={smtpPass} onChange={(e) => setSmtpPass(e.target.value)} />
           </div>
         </>
       )}
       <div>
-        <Label>xAI key for recaps {settings?.aiHint ? `(saved …${settings.aiHint})` : ""}</Label>
+        <Label>xAI key for recaps {settings?.aiHint ? `(saved \u2026${settings.aiHint})` : ""}</Label>
         <Input
           type="password"
           autoComplete="off"
           value={xaiKey}
           onChange={(e) => setXaiKey(e.target.value)}
-          placeholder={settings?.hasAiKey ? "Leave blank to keep the saved key" : "xai-•••• from console.x.ai"}
+          placeholder={settings?.hasAiKey ? "Leave blank to keep the saved key" : "xai-\u2022\u2022\u2022\u2022 from console.x.ai"}
         />
-        <p className="mt-1 text-xs text-muted">
-          Optional. Daily recaps still write from the numbers without it. With a key, Grok writes the copy.
-        </p>
       </div>
-      <Button onClick={() => save.mutate()} disabled={save.isPending || !from.trim()}>
-        {save.isPending ? "Saving…" : "Save connection"}
-      </Button>
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <Button onClick={() => save.mutate()} disabled={save.isPending || !from.trim()}>
+          {save.isPending ? "Saving\u2026" : "Save connection"}
+        </Button>
+        <Button
+          type="button"
+          variant="navy"
+          disabled={clear.isPending}
+          onClick={() => {
+            if (!window.confirm("Clear Resend, SMTP, and xAI keys from this trip?")) return;
+            clear.mutate();
+          }}
+        >
+          {clear.isPending ? "Clearing\u2026" : "Clear API keys"}
+        </Button>
+        <Button
+          type="button"
+          variant="navy"
+          disabled={strip.isPending}
+          onClick={() => {
+            if (!window.confirm("Remove fake @younggunz.golf addresses so tests stop bouncing?")) return;
+            strip.mutate();
+          }}
+        >
+          {strip.isPending ? "Stripping\u2026" : "Clear fake player emails"}
+        </Button>
+      </div>
       <div className="flex flex-col gap-2 sm:flex-row">
-        <Input
-          type="email"
-          value={testTo}
-          onChange={(e) => setTestTo(e.target.value)}
-          placeholder="you@email.com"
-        />
+        <Input type="email" value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="you@email.com" />
         <Button variant="navy" onClick={() => test.mutate()} disabled={test.isPending || !testTo.trim()}>
-          {test.isPending ? "Sending…" : "Send test"}
+          {test.isPending ? "Sending\u2026" : "Send test"}
         </Button>
       </div>
     </section>
