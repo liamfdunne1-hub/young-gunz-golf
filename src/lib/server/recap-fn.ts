@@ -23,9 +23,10 @@ export const generateRecap = createServerFn({ method: "POST" })
 
 export const generateTestRecap = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .handler(async ({ context }) => {
-    const { withDb, requireAdmin } = await import("@/lib/server/db");
-    const { loadMailConfig } = await import("@/lib/server/email");
+  .validator(z.object({ to: z.string().email().optional() }))
+  .handler(async ({ context, data }) => {
+    const { withDb, requireAdmin, tripId } = await import("@/lib/server/db");
+    const { loadMailConfig, queueEmail, wrapHtml, escapeHtml } = await import("@/lib/server/email");
     const { writeRecapWithAi } = await import("@/lib/server/ai");
     const { loadBootstrap } = await import("@/lib/server/bootstrap");
     const sql = await withDb();
@@ -61,10 +62,25 @@ export const generateTestRecap = createServerFn({ method: "POST" })
     };
     const cfg = await loadMailConfig(sql);
     const { draft, usedAi } = await writeRecapWithAi(fake as typeof snapshot, round.date, cfg.xaiKey);
+    let emailed = false;
+    if (data.to) {
+      const tid = await tripId(sql);
+      const result = await queueEmail(sql, {
+        tripId: tid,
+        toEmail: data.to,
+        subject: `[TEST] ${draft.title}`,
+        html: wrapHtml(
+          draft.title,
+          `<p><strong>Fake cards. Not the trip.</strong> ${usedAi ? "Grok wrote this." : "Template wrote this."}</p><p>${escapeHtml(draft.body)}</p>${draft.quote ? `<p><em>${escapeHtml(draft.quote)}</em></p>` : ""}`,
+        ),
+        type: "test",
+      });
+      emailed = result.status === "sent";
+    }
     return {
       ...draft,
       usedAi,
-      fromNumbers: !usedAi,
+      emailed,
       note: usedAi
         ? undefined
         : cfg.xaiKey
