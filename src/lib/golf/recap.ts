@@ -3,6 +3,7 @@ import { playerName } from "@/lib/utils";
 import { forceParagraphs } from "@/lib/golf/paragraphs";
 import { fakeQuotes } from "@/lib/golf/quotes";
 import { recapSystemPrompt as loudPrompt } from "@/lib/golf/voice";
+import { holesForDay } from "@/lib/golf/holes";
 
 export type RecapDraft = {
   day: string;
@@ -22,19 +23,6 @@ function nameOf(data: Bootstrap, id: number | null | undefined): string {
   return p ? playerName(p) : "nobody";
 }
 
-function disastersForDay(data: Bootstrap, day: string) {
-  const rounds = data.rounds.filter((r) => r.date === day);
-  const roundIds = new Set(rounds.map((r) => r.id));
-  const scores = data.scores.filter((s) => roundIds.has(s.round_id) && s.gross != null);
-  const disasters: { name: string; hole: number; gross: number }[] = [];
-  for (const s of scores) {
-    const gross = s.gross ?? 0;
-    if (gross >= 6) disasters.push({ name: nameOf(data, s.player_id), hole: s.hole, gross });
-  }
-  disasters.sort((a, b) => b.gross - a.gross);
-  return disasters.slice(0, 6);
-}
-
 export function recapFacts(data: Bootstrap, day: string) {
   const rounds = data.rounds.filter((r) => r.date === day);
   const roundIds = new Set(rounds.map((r) => r.id));
@@ -42,10 +30,8 @@ export function recapFacts(data: Bootstrap, day: string) {
   const scores = data.scores.filter((s) => roundIds.has(s.round_id));
   const matches = data.matches.filter((m) => roundIds.has(m.round_id));
   const posted = new Set(scores.map((s) => s.player_id)).size;
-  const disasters = disastersForDay(data, day);
+  const { disasters, heroes } = holesForDay(data, day);
   const lowGross = [...stats].filter((s) => s.bestGross != null).sort((a, b) => (a.bestGross ?? 99) - (b.bestGross ?? 99))[0];
-  const lowNet = [...stats].filter((s) => s.netAvg != null).sort((a, b) => (a.netAvg ?? 99) - (b.netAvg ?? 99))[0];
-  const birds = [...stats].sort((a, b) => b.birdies - a.birdies)[0];
   const blow = [...stats].filter((s) => s.worstHole != null).sort((a, b) => (b.worstHole ?? 0) - (a.worstHole ?? 0))[0];
   const skins = [...stats].sort((a, b) => b.skins - a.skins)[0];
   const seth = [...stats].sort((a, b) => b.askSeth - a.askSeth)[0];
@@ -73,14 +59,13 @@ export function recapFacts(data: Bootstrap, day: string) {
     posted,
     rounds: roundNotes,
     lowGross: lowGross ? { name: nameOf(data, lowGross.playerId), score: lowGross.bestGross } : null,
-    lowNet: lowNet ? { name: nameOf(data, lowNet.playerId), score: lowNet.netAvg } : null,
-    birdies: birds && birds.birdies > 0 ? { name: nameOf(data, birds.playerId), n: birds.birdies } : null,
     blowUp: blow?.worstHole ? { name: nameOf(data, blow.playerId), score: blow.worstHole } : null,
     skins: skins && skins.skins > 0 ? { name: nameOf(data, skins.playerId), n: skins.skins } : null,
     askSeth: seth && seth.askSeth > 0 ? { name: nameOf(data, seth.playerId), n: seth.askSeth } : null,
     matches: matchLines,
     scoresPosted: scores.length,
     disasters,
+    heroes,
     next: upcoming
       ? {
           name: upcoming.name,
@@ -105,29 +90,18 @@ export async function orlandoWeather(isoDate: string): Promise<string> {
     const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
     if (!res.ok) throw new Error("weather");
     const json = (await res.json()) as {
-      daily?: {
-        temperature_2m_max?: number[];
-        temperature_2m_min?: number[];
-        precipitation_probability_max?: number[];
-        weathercode?: number[];
-      };
+      daily?: { temperature_2m_max?: number[]; temperature_2m_min?: number[]; precipitation_probability_max?: number[]; weathercode?: number[] };
     };
     const hi = json.daily?.temperature_2m_max?.[0];
     const lo = json.daily?.temperature_2m_min?.[0];
     const rain = json.daily?.precipitation_probability_max?.[0];
     const code = json.daily?.weathercode?.[0];
     const sky =
-      code != null && code >= 80
-        ? "pop-up storms hunting mid-handicaps"
-        : code != null && code >= 61
-          ? "rain that will be blamed on the guy who washed his ball"
-          : code != null && code >= 1
-            ? "clouds, excuses, and a 2pm beer"
-            : "that bright Florida bastard of a sun";
+      code != null && code >= 80 ? "pop-up storms hunting mid-handicaps" : code != null && code >= 61 ? "rain with a vendetta" : "that bright Florida bastard of a sun";
     if (hi == null) return "Orlando will be humid enough to steam a brat.";
     return `${Math.round(lo ?? hi)}-${Math.round(hi)}F, ${sky}${rain && rain >= 30 ? `, ${rain}% chance it soaks the idiot who left his cover in the cart` : ""}.`;
   } catch {
-    return "Forecast desk is drunk. Assume humidity, a breeze that only exists after a snap-hook, and someone asking if that's a water hazard.";
+    return "Forecast desk is drunk. Assume humidity and a snap-hook.";
   }
 }
 
@@ -143,16 +117,12 @@ export function templateRecap(data: Bootstrap, day: string, weather?: string): R
   const quotes = fakeQuotes(f);
   const paras = [
     `${weekday} at ${courseLine}. ${f.posted} of ${f.field} grown-ass men turned in a card and immediately started lying.`,
-    f.lowGross
-      ? `Low gross is ${f.lowGross.name} at ${f.lowGross.score}. Either he striped it or the rest of you played like hungover amateurs. Both can be true.`
-      : "Nobody finished 18. Cowards.",
-    f.skins ? `Skins sit with ${f.skins.name} (${f.skins.n}). Unique low. Ties pushed. Not a casino, just ritual humiliation.` : "Skins are still arguing with themselves.",
+    f.lowGross ? `Low gross is ${f.lowGross.name} at ${f.lowGross.score}. The rest of you owe him a beer and an apology.` : "Nobody finished 18. Cowards.",
     quotes[0],
-    f.blowUp ? `Biggest dumpster fire: ${f.blowUp.name} and a ${f.blowUp.score}. Hide the beers and the index.` : "",
+    f.blowUp ? `Biggest dumpster fire: ${f.blowUp.name} and a ${f.blowUp.score}.` : "",
     quotes[1],
-    f.matches.length ? `Matches: ${f.matches.slice(0, 3).join("; ")}.` : "Match play is waiting on Seth like a bar tab.",
     quotes[2],
-    f.askSeth ? `${f.askSeth.name} mashed the Seth button ${f.askSeth.n} times like it was a mulligan dispenser.` : "",
+    f.matches.length ? `Matches: ${f.matches.slice(0, 3).join("; ")}.` : "",
   ].filter(Boolean) as string[];
   if (f.next) {
     const wx = weather ?? "Humidity with a chance of excuses.";
@@ -162,10 +132,7 @@ export function templateRecap(data: Bootstrap, day: string, weather?: string): R
       day: "numeric",
       timeZone: "America/New_York",
     });
-    paras.push(`Coming up: ${f.next.name} at ${f.next.course}${f.next.teeTime ? `, ${f.next.teeTime}` : ""} on ${when}.`);
-    paras.push(`Weather desk: ${wx} Ice the lower back. Stretch the ego.`)
-  } else {
-    paras.push("No next round on the sheet. Ice your lower back and lie to each other at dinner.");
+    paras.push(`Coming up: ${f.next.name} at ${f.next.course}${f.next.teeTime ? `, ${f.next.teeTime}` : ""} on ${when}. Weather: ${wx}`);
   }
   return {
     day,
