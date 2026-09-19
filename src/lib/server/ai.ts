@@ -42,7 +42,7 @@ export async function writeRecapWithAi(
         },
         body: JSON.stringify({
           model,
-          temperature: 1.05,
+          temperature: 1.2,
           messages: [
             { role: "system", content: recapSystemPrompt() },
             { role: "user", content: JSON.stringify({ ...facts, weather }) },
