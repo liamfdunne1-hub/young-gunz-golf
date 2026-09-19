@@ -1,7 +1,9 @@
 import { createRootRoute, HeadContent, Navigate, Outlet, Scripts, useRouterState } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
+import { useEffect, useState } from "react";
 import { AuthProvider } from "@/lib/auth/provider";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { leaveGuestMode, useGuestMode } from "@/lib/guest";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { Providers } from "@/components/providers";
 import { AppShell } from "@/components/layout/app-shell";
@@ -59,12 +61,21 @@ function RootComponent() {
 function ShellGate() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const { user, isPending } = useCurrentUserState();
+  const guest = useGuestMode();
   const publicPath = path === "/login" || path.startsWith("/invite");
+  const [ready, setReady] = useState(false);
 
-  if (isPending) {
+  useEffect(() => {
+    setReady(true);
+  }, []);
+  useEffect(() => {
+    if (user) leaveGuestMode();
+  }, [user]);
+
+  if (isPending || !ready) {
     return publicPath ? <Outlet /> : <div className="min-h-dvh bg-navy" />;
   }
-  if (!user && !publicPath) return <Navigate to="/login" />;
+  if (!user && !guest && !publicPath) return <Navigate to="/login" />;
   if (user && path === "/login") return <Navigate to="/" />;
   if (publicPath) return <Outlet />;
   return (

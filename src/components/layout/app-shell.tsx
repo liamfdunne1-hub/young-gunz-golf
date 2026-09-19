@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { Bell, Flag, Home, LayoutGrid, Trophy, CircleDollarSign } from "lucide-react";
 import { SignedIn, SignedOut } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { useGuestMode } from "@/lib/guest";
 import { Crest } from "@/components/crest";
 import { AskSeth } from "@/components/ask-seth";
 import { IdentityChip } from "@/components/identity-chip";
@@ -31,6 +32,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const me = useMeQuery();
   const trip = useTrip();
   const { isPending } = useCurrentUserState();
+  const guest = useGuestMode();
   const [tag, setTag] = useState(0);
   useEffect(() => {
     const t = window.setInterval(() => setTag((n) => (n + 1) % SECONDARY_TAGLINES.length), 8000);
@@ -83,6 +85,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ) : (
               <>
                 <SignedOut>
+                  {guest ? (
+                    <span className="hidden text-[10px] uppercase tracking-[0.14em] text-muted sm:inline">Guest</span>
+                  ) : null}
                   <Link
                     to="/login"
                     className="rounded-full border border-gold/40 px-3 py-1.5 text-xs uppercase tracking-[0.14em] text-gold"

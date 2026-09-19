@@ -78,22 +78,19 @@ export function mapPlayer(row: PlayerRow): Player {
 export async function playerByUser(sql: Sql, userId: string, email: string | null): Promise<Player | null> {
   const byUser = await sql<PlayerRow>`select * from players where user_id = ${userId} limit 1`;
   if (byUser[0]) return mapPlayer(byUser[0]);
-
-  if (email) {
-    const byEmail = await sql<PlayerRow>`
-      select * from players where lower(email) = ${email.toLowerCase()} limit 1
-    `;
-    if (byEmail[0] && !byEmail[0].user_id) {
-      await sql`
-        update players set user_id = ${userId}, registered_at = coalesce(registered_at, now())
-        where id = ${byEmail[0].id}
-      `;
-      return mapPlayer({ ...byEmail[0], user_id: userId });
-    }
-    if (byEmail[0]?.user_id === userId) return mapPlayer(byEmail[0]);
-  }
-
   return null;
+}
+
+/** Open a claimed bag. Email goes back to a placeholder so the next login cannot silently reclaim it. */
+export async function clearBagClaim(sql: Sql, playerId: number, slug: string): Promise<void> {
+  const pending = `pending+${slug}-${crypto.randomUUID().slice(0, 8)}@younggunz.golf`;
+  await sql`
+    update players
+    set user_id = null,
+        registered_at = null,
+        email = ${pending}
+    where id = ${playerId}
+  `;
 }
 
 export async function requireAdmin(sql: Sql, userId: string, email: string | null): Promise<Player | null> {

@@ -5,6 +5,7 @@ import { Countdown } from "@/components/countdown";
 import { PlayerAvatar } from "@/components/avatar";
 import { ACTION_TICKER, PRIMARY_TAGLINE, SECONDARY_TAGLINES, SETH_TITLES } from "@/lib/constants";
 import { useMeQuery, useStats } from "@/lib/hooks";
+import { useGuestMode } from "@/lib/guest";
 import { formatHandicap, playerName } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({ component: Home });
@@ -12,6 +13,7 @@ export const Route = createFileRoute("/")({ component: Home });
 function Home() {
   const { data, stats, isPending } = useStats();
   const me = useMeQuery();
+  const guest = useGuestMode();
   const [tag, setTag] = useState(0);
   const [title, setTitle] = useState(0);
   const [tick, setTick] = useState(0);
@@ -77,7 +79,7 @@ function Home() {
                 <p className="text-xs text-cream/70">Seth Young · {SETH_TITLES[title]}</p>
               </div>
             </div>
-            <p className="text-sm text-cream/80">{greeting}</p>
+            <p className="text-sm text-cream/80">{guest && !player ? "Welcome, spectator." : greeting}</p>
             <h1 className="font-display text-5xl leading-[0.9] text-cream md:text-7xl">
               Young Gunz
               <span className="block text-3xl text-gold md:text-5xl">Orlando 2026</span>

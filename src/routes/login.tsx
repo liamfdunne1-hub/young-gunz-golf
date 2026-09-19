@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { GROK_PROVIDERS, authClient, authEnabled, signIn } from "@/lib/auth/client";
+import { enterGuestMode } from "@/lib/guest";
 import { Crest } from "@/components/crest";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
@@ -9,6 +10,7 @@ import { PRIMARY_TAGLINE } from "@/lib/constants";
 export const Route = createFileRoute("/login")({ component: Login });
 
 function Login() {
+  const navigate = useNavigate();
   const [mode, setMode] = useState<"in" | "up">("in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -50,11 +52,8 @@ function Login() {
         <div className="panel p-5">
           <h2 className="font-display text-2xl">Sign in</h2>
           <p className="mb-4 text-sm text-muted">
-            Google, X, or email. If this preview already signed you in as Grok User, skip this page and{" "}
-            <Link to="/locker" className="text-gold hover:underline">
-              claim a bag in the locker room
-            </Link>
-            .
+            Claim a bag with Google, X, or email. Or walk the grounds as a guest — scores, pairings, and the ledger are
+            visible. Scoring and Seth Mode still require an account.
           </p>
           {authEnabled ? (
             <div className="space-y-2">
@@ -73,6 +72,17 @@ function Login() {
           ) : (
             <p className="text-sm text-muted">Sign-in is disabled.</p>
           )}
+          <Button
+            type="button"
+            variant="ghost"
+            className="mt-2 w-full"
+            onClick={() => {
+              enterGuestMode();
+              void navigate({ to: "/" });
+            }}
+          >
+            Continue as guest
+          </Button>
           <div className="gold-rule my-5" />
           <form onSubmit={onEmail} className="space-y-3">
             {mode === "up" ? (

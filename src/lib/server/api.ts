@@ -7,6 +7,7 @@ import {
   tripId,
   mapPlayer,
   playerByUser,
+  clearBagClaim,
   requireAdmin,
   grantSethMode,
   audit,
@@ -1080,11 +1081,30 @@ export const dropBag = createServerFn({ method: "POST" })
     const sql = await withDb();
     const ident = await userEmail(sql, context.userId);
     const current = await playerByUser(sql, context.userId, ident.email);
-    await sql`update players set user_id = null where user_id = ${context.userId}`;
     if (current) {
+      await clearBagClaim(sql, current.id, current.slug);
       await audit(sql, context.userId, "drop_bag", "player", current.id);
+    } else {
+      await sql`update players set user_id = null where user_id = ${context.userId}`;
     }
     return { ok: true as const };
+  });
+
+export const releaseBag = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(z.object({ playerId: z.number().int().positive() }))
+  .handler(async ({ context, data }) => {
+    const sql = await withDb();
+    const ident = await userEmail(sql, context.userId);
+    await requireAdmin(sql, context.userId, ident.email);
+    const [p] = await sql<{ id: number; slug: string; first_name: string; last_name: string; user_id: string | null }>`
+      select id, slug, first_name, last_name, user_id from players where id = ${data.playerId}
+    `;
+    if (!p) throw new Error("Not on the field.");
+    if (!p.user_id) throw new Error("That bag is already open.");
+    await clearBagClaim(sql, p.id, p.slug);
+    await audit(sql, context.userId, "release_bag", "player", p.id);
+    return { ok: true as const, name: `${p.first_name} ${p.last_name}` };
   });
 
 

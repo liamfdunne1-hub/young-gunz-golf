@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { addPlayer, deletePlayer, updatePlayer } from "@/lib/server/api";
+import { addPlayer, deletePlayer, releaseBag, updatePlayer } from "@/lib/server/api";
 import { useMeQuery, useTrip } from "@/lib/hooks";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
@@ -105,6 +105,14 @@ function Editor({ player, onChanged }: { player: Player; onChanged: () => void }
       toast.error(e.message);
     },
   });
+  const disconnect = useMutation({
+    mutationFn: () => releaseBag({ data: { playerId: player.id } }),
+    onSuccess: (res) => {
+      toast(`${res.name} is off that login. The bag is open in the locker room.`);
+      onChanged();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const claimed = Boolean(player.user_id || player.registered_at);
   const emailLabel = isPlaceholderEmail(player.email) ? "Waiting to claim" : player.email;
 
@@ -126,6 +134,11 @@ function Editor({ player, onChanged }: { player: Player; onChanged: () => void }
         <Button size="sm" type="button" onClick={() => save.mutate()} disabled={save.isPending}>
           Save handicap
         </Button>
+        {claimed ? (
+          <Button size="sm" type="button" variant="navy" onClick={() => disconnect.mutate()} disabled={disconnect.isPending}>
+            {disconnect.isPending ? "Disconnecting…" : "Disconnect bag"}
+          </Button>
+        ) : null}
         {confirm ? (
           <Button size="sm" type="button" variant="danger" onClick={() => remove.mutate()} disabled={remove.isPending}>
             {remove.isPending ? "Removing…" : `Yes, delete ${player.first_name}`}

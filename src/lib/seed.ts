@@ -738,23 +738,21 @@ async function insertHoles(sql: Sql, teeId: number, holes: Hole[]) {
       values (${teeId}, ${i + 1}, ${h.par}, ${h.yards}, ${h.si})
     `;
 }
-const globalSeed = globalThis as typeof globalThis & { __ygSeedPromiseV2__?: Promise<void> };
+const globalSeed = globalThis as typeof globalThis & { __ygSeedPromiseV3__?: Promise<void> };
 export async function ensureSeeded(sql: Sql) {
-	globalSeed.__ygSeedPromiseV2__ ??= (async () => {
+	globalSeed.__ygSeedPromiseV3__ ??= (async () => {
 		const existing = await sql<{ id: number }>`select id from trips limit 1`;
 		if (existing.length) {
 			await patchTripSettings(sql);
-			await restoreOriginalRoster(sql);
 			return;
 		}
 		await seed(sql);
 		await patchTripSettings(sql);
-		await restoreOriginalRoster(sql);
 	})().catch((err) => {
-		globalSeed.__ygSeedPromiseV2__ = undefined;
+		globalSeed.__ygSeedPromiseV3__ = undefined;
 		throw err;
 	});
-	await globalSeed.__ygSeedPromiseV2__;
+	await globalSeed.__ygSeedPromiseV3__;
 }
 async function patchTripSettings(sql: Sql) {
 	await sql`
@@ -764,71 +762,6 @@ async function patchTripSettings(sql: Sql) {
         skins_pot = coalesce(skins_pot, ${DEFAULT_SKINS_POT})
   `;
 	await sql`update rounds set allowance_pct = 90 where allowance_pct = 100`;
-}
-
-async function restoreOriginalRoster(sql: Sql) {
-	const [trip] = await sql<{ id: number }>`select id from trips limit 1`;
-	if (!trip) return;
-	const keep = PLAYERS.map((p) => p.slug);
-	const extras = await sql<{ id: number; slug: string }>`select id, slug from players`;
-	for (const row of extras) {
-		if (keep.includes(row.slug)) continue;
-		await removePlayerRow(sql, row.id);
-	}
-	for (const p of PLAYERS) {
-		const ch = courseHandicap(p.index, 131, 72.9, 72);
-		const ph = playingHandicap(ch);
-		const [found] = await sql<{ id: number }>`select id from players where slug = ${p.slug} limit 1`;
-		if (found) {
-			await sql`
-        update players set
-          first_name = ${p.first},
-          last_name = ${p.last},
-          nickname = ${p.nickname},
-          email = ${p.email},
-          role = ${p.role},
-          handicap_index = ${p.index},
-          course_handicap = ${ch},
-          playing_handicap = ${ph},
-          tee_name = ${p.tee},
-          scouting_report = ${p.report},
-          threat_level = ${p.threat},
-          joke_metrics = ${JSON.stringify(p.metrics)}::jsonb,
-          user_id = null,
-          registered_at = null
-        where slug = ${p.slug}
-      `;
-		} else {
-			const [row] = await sql<{ id: number }>`
-        insert into players (
-          trip_id, first_name, last_name, nickname, email, slug, role,
-          handicap_index, course_handicap, playing_handicap, tee_name,
-          scouting_report, threat_level, joke_metrics, invite_token, invited_at
-        ) values (
-          ${trip.id}, ${p.first}, ${p.last}, ${p.nickname}, ${p.email}, ${p.slug}, ${p.role},
-          ${p.index}, ${ch}, ${ph}, ${p.tee},
-          ${p.report}, ${p.threat}, ${JSON.stringify(p.metrics)}::jsonb,
-          ${crypto.randomUUID()}, now()
-        )
-        returning id
-      `;
-			await sql`insert into notification_prefs (player_id) values (${row.id}) on conflict (player_id) do nothing`;
-		}
-	}
-	await sql`delete from handicap_overrides`;
-}
-
-async function removePlayerRow(sql: Sql, id: number) {
-	await sql`delete from matches where a1 = ${id} or a2 = ${id} or b1 = ${id} or b2 = ${id}`;
-	await sql`delete from ledger_entries where from_player_id = ${id} or to_player_id = ${id}`;
-	await sql`delete from pool_entries where player_id = ${id}`;
-	await sql`delete from pool_settlements where player_id = ${id}`;
-	await sql`update awards set player_id = null where player_id = ${id}`;
-	await sql`update market_selections set player_id = null where player_id = ${id}`;
-	await sql`update emails set to_player_id = null where to_player_id = ${id}`;
-	await sql`update photos set player_id = null where player_id = ${id}`;
-	await sql`update announcements set author_player_id = null where author_player_id = ${id}`;
-	await sql`delete from players where id = ${id}`;
 }
 async function seed(sql: Sql) {
 	const [trip] = await sql<{ id: number }>`
