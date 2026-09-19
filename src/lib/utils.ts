@@ -54,7 +54,12 @@ export function slugify(value: string): string {
 
 export function isPlaceholderEmail(email: string): boolean {
   const e = email.trim().toLowerCase();
-  return e.startsWith("pending+") || e.endsWith("@pending.younggunz.golf") || e.endsWith(".invalid");
+  return (
+    e.startsWith("pending+") ||
+    e.endsWith("@pending.younggunz.golf") ||
+    e.endsWith("@younggunz.golf") ||
+    e.endsWith(".invalid")
+  );
 }
 
 export function isAttachableEmail(email: string | null | undefined): email is string {
