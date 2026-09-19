@@ -1,4 +1,4 @@
-import { recapSystemPrompt, templateRecap, orlandoWeather, recapFacts, type RecapDraft } from "@/lib/golf/recap";
+import { recapSystemPrompt, templateRecap, orlandoWeather, recapFacts, forceParagraphs, type RecapDraft } from "@/lib/golf/recap";
 import type { Bootstrap } from "@/lib/golf/derive";
 
 const MODELS = ["grok-3", "grok-3-mini", "grok-2-latest"];
@@ -13,7 +13,7 @@ function parseDraft(raw: string, fallback: RecapDraft): RecapDraft {
     return {
       day: fallback.day,
       title: String(json.title).slice(0, 140),
-      body: String(json.body).slice(0, 10000),
+      body: forceParagraphs(String(json.body).slice(0, 10000)),
       quote: String(json.quote ?? fallback.quote).slice(0, 320),
     };
   } catch {
@@ -61,8 +61,6 @@ export async function writeRecapWithAi(
       lastError = err instanceof Error ? err.message : "AI request failed";
     }
   }
-  if (lastError) {
-    return { draft: fallback, usedAi: false };
-  }
+  if (lastError) return { draft: fallback, usedAi: false };
   return { draft: fallback, usedAi: false };
 }
