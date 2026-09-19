@@ -62,11 +62,16 @@ function Profile() {
                 const round = data.rounds.find((r) => r.id === m.round_id);
                 const side = m.a1 === p.id || m.a2 === p.id ? "A" : "B";
                 const partnerId = side === "A" ? (m.a1 === p.id ? m.a2 : m.a1) : m.b1 === p.id ? m.b2 : m.b1;
-                const partner = data.players.find((x) => x.id === partnerId);
+                const partner = partnerId ? data.players.find((x) => x.id === partnerId) : null;
                 return (
                   <li key={m.id} className="flex justify-between text-sm">
                     <span>
-                      R{round?.round_number} with {partner?.first_name ?? "?"}
+                      R{round?.round_number}{" "}
+                      {m.format === "wolf"
+                        ? "Wolf"
+                        : partner
+                          ? `with ${partner.first_name}`
+                          : "solo"}
                     </span>
                     <span className="text-gold">{m.result ?? "AS"}</span>
                   </li>

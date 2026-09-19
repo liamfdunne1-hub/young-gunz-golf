@@ -32,8 +32,8 @@ export function recapFacts(data: Bootstrap, day: string) {
   const matchLines = matches
     .filter((m) => m.status === "final" || m.winner_side)
     .map((m) => {
-      const a = `${nameOf(data, m.a1)} / ${nameOf(data, m.a2)}`;
-      const b = `${nameOf(data, m.b1)} / ${nameOf(data, m.b2)}`;
+      const a = m.a2 ? `${nameOf(data, m.a1)} / ${nameOf(data, m.a2)}` : nameOf(data, m.a1);
+      const b = m.b2 ? `${nameOf(data, m.b1)} / ${nameOf(data, m.b2)}` : nameOf(data, m.b1);
       if (!m.winner_side) return `${a} halved ${b}${m.result ? ` (${m.result})` : ""}`;
       const win = m.winner_side === "a" ? a : b;
       return `${win} ${m.result ?? "won"} vs ${m.winner_side === "a" ? b : a}`;

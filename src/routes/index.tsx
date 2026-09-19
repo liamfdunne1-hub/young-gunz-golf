@@ -7,6 +7,7 @@ import { ACTION_TICKER, PRIMARY_TAGLINE, SECONDARY_TAGLINES, SETH_TITLES } from 
 import { useMeQuery, useStats } from "@/lib/hooks";
 import { useGuestMode } from "@/lib/guest";
 import { formatHandicap, playerName } from "@/lib/utils";
+import { FORMAT_LABEL, asFormat, teeLabel } from "@/lib/golf/formats";
 
 export const Route = createFileRoute("/")({ component: Home });
 
@@ -39,7 +40,7 @@ function Home() {
   const greeting = player ? `Good ${hourWord()}, ${player.first_name}` : "Young Gunz";
   const myFlight = data?.flights.find((f) => f.player_id === player?.id && f.direction === "arrival");
 
-  const myGroup = useMemo(() => {
+  const myGroupMeta = useMemo(() => {
     if (!data || !player || !nextRound) return null;
     const gps = data.groupPlayers.filter((g) => {
       const group = data.groups.find((x) => x.id === g.group_id);
@@ -47,11 +48,14 @@ function Home() {
     });
     const mine = gps.find((g) => g.player_id === player.id);
     if (!mine) return null;
-    return gps
+    const group = data.groups.find((x) => x.id === mine.group_id);
+    const members = gps
       .filter((g) => g.group_id === mine.group_id)
       .map((g) => data.players.find((p) => p.id === g.player_id))
       .filter(Boolean);
+    return { members, group };
   }, [data, player, nextRound]);
+  const myGroup = myGroupMeta?.members ?? null;
 
   if (isPending || !data) {
     return (
@@ -103,9 +107,15 @@ function Home() {
             s={nextRound ? `${nextRound.date} · ${nextRound.tee_time}` : ""}
           />
           <DashCard
-            k="Your pairing"
+            k="Your tee time"
             v={myGroup ? myGroup.map((p) => p!.first_name).join(" / ") : "Not yet announced"}
-            s={myGroup ? "" : "Waiting for Seth to rearrange everyone for the 14th time."}
+            s={
+              myGroup
+                ? myGroupMeta?.group
+                  ? teeLabel(myGroupMeta.group.group_number, myGroupMeta.group.tee_time)
+                  : ""
+                : "Waiting for Seth to rearrange everyone for the 14th time."
+            }
           />
           <DashCard
             k="Your flight"
@@ -123,7 +133,7 @@ function Home() {
               <p className="text-[11px] uppercase tracking-[0.22em] text-gold">Next round</p>
               <h2 className="font-display text-3xl">{nextCourse.name}</h2>
               <p className="text-sm text-muted">
-                {nextRound.date} · {nextRound.tee_time}
+                {nextRound.date} · {nextRound.tee_time} · {FORMAT_LABEL[asFormat(nextRound.format)]}
               </p>
               <p className="mt-2 text-sm text-cream/80">{nextRound.theme}</p>
               {nextRound.tee_time === "6:50 AM" ? (

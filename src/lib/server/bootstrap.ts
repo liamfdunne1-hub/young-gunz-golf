@@ -3,6 +3,7 @@ import { num } from "@/lib/utils";
 import { DEFAULT_MATCH_STAKE } from "@/lib/golf/bets";
 import { DEFAULT_SKINS_POT } from "@/lib/golf/skins";
 import { FOUR_BALL_MATCH_ALLOWANCE } from "@/lib/golf/handicap";
+import { asFormat, asShape, asKind } from "@/lib/golf/formats";
 
 export async function loadBootstrap() {
   const sql = await withDb();
@@ -69,12 +70,21 @@ export async function loadBootstrap() {
     status: string;
     pairings_status: string;
     allowance_pct: number;
+    format: string | null;
+    group_shape: string | null;
   }>`select * from rounds order by round_number`;
 
   const publishedRoundIds = rounds.filter((r) => r.pairings_status === "published").map((r) => r.id);
 
-  const groupsAll = await sql<{ id: number; round_id: number; group_number: number; locked: boolean }>`
-    select * from groups where group_number <= 3 order by round_id, group_number
+  const groupsAll = await sql<{
+    id: number;
+    round_id: number;
+    group_number: number;
+    locked: boolean;
+    format: string | null;
+    tee_time: string | null;
+  }>`
+    select * from groups where group_number <= 5 order by round_id, group_number
   `;
   const groups = groupsAll.filter((g) => publishedRoundIds.includes(g.round_id));
   const groupIds = groups.map((g) => g.id);
@@ -87,10 +97,11 @@ export async function loadBootstrap() {
     id: number;
     round_id: number;
     group_id: number | null;
+    kind: string | null;
     a1: number;
-    a2: number;
-    b1: number;
-    b2: number;
+    a2: number | null;
+    b1: number | null;
+    b2: number | null;
     status: string;
     result: string | null;
     winner_side: string | null;
@@ -98,6 +109,7 @@ export async function loadBootstrap() {
     thru: number | null;
     stake: string | number | null;
     bet_status: string;
+    format: string | null;
   }>`select * from matches order by id`;
 
   const scores = await sql<{
@@ -226,6 +238,35 @@ export async function loadBootstrap() {
     published: boolean;
   }>`select * from report_cards`;
 
+  const teamScores = await sql<{
+    match_id: number;
+    round_id: number;
+    side: string;
+    hole_number: number;
+    gross: number;
+    net: number;
+    strokes: number;
+  }>`select match_id, round_id, side, hole_number, gross, net, strokes from team_scores`.catch(() => []);
+
+  const wolfPicks = await sql<{
+    round_id: number;
+    group_id: number;
+    hole_number: number;
+    wolf_player_id: number;
+    partner_player_id: number | null;
+    lone: boolean;
+  }>`select round_id, group_id, hole_number, wolf_player_id, partner_player_id, lone from wolf_picks`.catch(() => []);
+
+  const vegasSplits = await sql<{
+    round_id: number;
+    group_id: number;
+    hole_number: number;
+    a1: number;
+    a2: number;
+    b1: number;
+    b2: number;
+  }>`select round_id, group_id, hole_number, a1, a2, b1, b2 from vegas_splits`.catch(() => []);
+
   const roundHandicaps = await sql<{
     round_id: number;
     player_id: number;
@@ -271,11 +312,18 @@ export async function loadBootstrap() {
     courses,
     tees: tees.map((t) => ({ ...t, rating: num(t.rating) })),
     holes,
-    rounds: rounds.map((r) => ({ ...r, allowance_pct: r.allowance_pct || FOUR_BALL_MATCH_ALLOWANCE })),
-    groups,
+    rounds: rounds.map((r) => ({
+      ...r,
+      allowance_pct: r.allowance_pct || FOUR_BALL_MATCH_ALLOWANCE,
+      format: asFormat(r.format),
+      group_shape: asShape(r.group_shape),
+    })),
+    groups: groups.map((g) => ({ ...g, format: g.format ? asFormat(g.format) : null, tee_time: g.tee_time ?? null })),
     groupPlayers,
     matches: matches.map((m) => ({
       ...m,
+      format: asFormat(m.format),
+      kind: asKind(m.kind, m.group_id == null ? "inter" : "group"),
       stake: num(m.stake, DEFAULT_MATCH_STAKE),
       bet_status: m.bet_status ?? "open",
     })),
@@ -302,5 +350,8 @@ export async function loadBootstrap() {
       handicap_index: num(h.handicap_index),
     })),
     ledger: ledger.map((e) => ({ ...e, amount: num(e.amount) })),
+    teamScores,
+    wolfPicks,
+    vegasSplits,
   };
 }

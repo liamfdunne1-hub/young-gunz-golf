@@ -1028,11 +1028,7 @@ async function seed(sql: Sql) {
       returning id
     `;
 		roundIds.push(row.id);
-		for (const n of [
-			1,
-			2,
-			3
-		]) await sql`insert into groups (round_id, group_number) values (${row.id}, ${n})`;
+		for (const n of [1, 2, 3, 4, 5]) await sql`insert into groups (round_id, group_number) values (${row.id}, ${n})`;
 	}
 	const itinerary = [
 		{

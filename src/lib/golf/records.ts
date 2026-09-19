@@ -274,7 +274,9 @@ export function deriveRecords(data: Bootstrap, skins: SkinsBoard): RecordGroup[]
   const matchWins = new Map<number, number>();
   for (const m of data.matches) {
     if (m.status !== "final" || !m.winner_side) continue;
-    const ids = m.winner_side === "A" || m.winner_side === "a" ? [m.a1, m.a2] : [m.b1, m.b2];
+    const ids = (m.winner_side === "A" || m.winner_side === "a" ? [m.a1, m.a2] : [m.b1, m.b2]).filter(
+      (id): id is number => id != null,
+    );
     for (const id of ids) matchWins.set(id, (matchWins.get(id) ?? 0) + 1);
   }
   let matchWinLeader: { playerId: number; n: number } | null = null;

@@ -3,12 +3,14 @@ import { useState } from "react";
 import { BroadcastNav } from "@/components/broadcast-nav";
 import { PlayerAvatar } from "@/components/avatar";
 import { useStats } from "@/lib/hooks";
+import { deriveIntergroup } from "@/lib/golf/teams";
+import { FORMAT_LABEL } from "@/lib/golf/formats";
 import { formatMoney, playerName } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/leaderboard")({ component: Boards });
 
-const TABS = ["Match", "Gross", "Net", "Teams", "Birdies"] as const;
+const TABS = ["Intergroup", "Match", "Gross", "Net", "Teams", "Birdies"] as const;
 
 function Boards() {
   const { data, stats, skins, teams, isPending } = useStats();
@@ -21,6 +23,13 @@ function Boards() {
   const teamRows = [...teams.filter((t) => t.roundId === teamRoundId)].sort(
     (a, b) => (a.combinedNet ?? 999) - (b.combinedNet ?? 999),
   );
+  const groupRows = deriveIntergroup(data, teamRoundId ?? 0);
+
+  const toPar = (n: number | null) => {
+    if (n == null) return "—";
+    if (n === 0) return "E";
+    return n > 0 ? `+${n}` : String(n);
+  };
 
   const rows = [...stats].sort((a, b) => {
     if (tab === "Match") return b.points - a.points || b.holesWon - a.holesWon;
@@ -54,7 +63,60 @@ function Boards() {
         ))}
       </div>
 
-      {tab === "Teams" ? (
+      {tab === "Intergroup" ? (
+        <section className="space-y-3">
+          <p className="text-sm text-muted">
+            Every two-man side, ranked across tee times. Inter-tee matches count. In-tee Vegas does not invent locked partners — those re-form from the landing. Mixed formats rank on net to par; a Vegas-only field ranks on the combined number.
+          </p>
+          <select
+            className="h-11 w-full rounded-[12px] border border-line bg-navy px-3 sm:w-auto"
+            value={teamRoundId ?? ""}
+            onChange={(e) => setRoundId(Number(e.target.value))}
+          >
+            {data.rounds.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+          {groupRows.length === 0 ? (
+            <div className="panel p-4 text-sm text-muted">
+              No pairs on the board yet. Seth posts groups — five of two, or 4-3-3 with partners inside — and each group plays its own game.
+            </div>
+          ) : (
+            <ol className="space-y-2">
+              {groupRows.map((t, i) => {
+                const pa = data.players.find((p) => p.id === t.a);
+                const pb = data.players.find((p) => p.id === t.b);
+                return (
+                  <li key={t.key} className="panel p-3">
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 tabular text-gold">{i + 1}</span>
+                      <div className="flex -space-x-2">
+                        {pa ? <PlayerAvatar player={pa} size={32} /> : null}
+                        {pb ? <PlayerAvatar player={pb} size={32} /> : null}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm">{t.label}</p>
+                        <p className="text-[11px] text-muted">
+                          Group {t.groupNumber} · {FORMAT_LABEL[t.format]} · thru {t.thru || "—"}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-display text-2xl tabular text-gold">
+                          {t.gameScore == null ? "—" : t.gameScore}
+                        </p>
+                        <p className="text-[10px] uppercase tracking-[0.12em] text-muted">{t.gameName}</p>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-muted">Net to par {toPar(t.netToPar)}</p>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </section>
+      ) : tab === "Teams" ? (
         <section className="space-y-3">
           <p className="text-sm text-muted">
             Two-man teams for the day. Combined is both cards added. Best-ball is the better score on each hole.

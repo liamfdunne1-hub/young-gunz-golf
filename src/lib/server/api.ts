@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { num, playerName, slugify, isAttachableEmail } from "@/lib/utils";
+import { asFormat, asShape, allowanceForFormat, MAX_GROUPS, ROUND_FORMATS, SHAPE_SIZES, asKind } from "@/lib/golf/formats";
 import {
   withDb,
   tripId,
@@ -19,11 +20,12 @@ import {
 import {
   freezeHandicaps,
   saveGross,
+  saveTeamGross,
   roundScoreboard,
   refreshMatches,
   ensureFoursomeMatches,
   recomputeRoundNets,
-  pruneExtraGroups,
+  ensureRoundGroups,
 } from "@/lib/server/scoring";
 import { settlePool } from "@/lib/golf/pools";
 import { FOUR_BALL_MATCH_ALLOWANCE, courseHandicap, playingHandicap } from "@/lib/golf/handicap";
@@ -161,19 +163,43 @@ export const getDraftPairings = createServerFn({ method: "GET" })
     const sql = await withDb();
     const ident = await userEmail(sql, context.userId);
     await requireAdmin(sql, context.userId, ident.email);
-    await pruneExtraGroups(sql);
-    const groups = await sql<{ id: number; round_id: number; group_number: number; locked: boolean }>`
-      select * from groups where round_id = ${data.roundId} and group_number <= 3 order by group_number
+    await ensureRoundGroups(sql, data.roundId);
+    const groups = await sql<{
+      id: number;
+      round_id: number;
+      group_number: number;
+      locked: boolean;
+      format: string | null;
+      tee_time: string | null;
+    }>`
+      select * from groups where round_id = ${data.roundId} and group_number <= ${MAX_GROUPS} order by group_number
     `;
     const gps = await sql<{ group_id: number; player_id: number; position: number }>`
       select gp.group_id, gp.player_id, gp.position
       from group_players gp join groups g on g.id = gp.group_id
       where g.round_id = ${data.roundId}
     `;
-    const [round] = await sql<{ pairings_status: string }>`
-      select pairings_status from rounds where id = ${data.roundId}
+    const [round] = await sql<{ pairings_status: string; format: string | null; group_shape: string | null }>`
+      select pairings_status, format, group_shape from rounds where id = ${data.roundId}
     `;
-    return { groups, groupPlayers: gps, pairingsStatus: round?.pairings_status ?? "draft" };
+    const matches = await sql<{
+      id: number;
+      group_id: number | null;
+      kind: string | null;
+      format: string | null;
+      a1: number;
+      a2: number | null;
+      b1: number | null;
+      b2: number | null;
+    }>`select id, group_id, kind, format, a1, a2, b1, b2 from matches where round_id = ${data.roundId}`;
+    return {
+      groups,
+      groupPlayers: gps,
+      pairingsStatus: round?.pairings_status ?? "draft",
+      format: asFormat(round?.format),
+      groupShape: asShape(round?.group_shape),
+      matches: matches.map((m) => ({ ...m, kind: asKind(m.kind, m.group_id == null ? "inter" : "group") })),
+    };
   });
 
 export const getMomDesk = createServerFn({ method: "GET" })
@@ -319,23 +345,30 @@ export const savePairings = createServerFn({ method: "POST" })
 
 export const randomizePairings = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator(z.object({ roundId: z.number() }))
+  .validator(z.object({ roundId: z.number(), shape: z.enum(["foursomes", "pairs"]).optional() }))
   .handler(async ({ context, data }) => {
     const sql = await withDb();
     const ident = await userEmail(sql, context.userId);
     await requireAdmin(sql, context.userId, ident.email);
+    await ensureRoundGroups(sql, data.roundId);
+    if (data.shape) {
+      await sql`update rounds set group_shape = ${data.shape} where id = ${data.roundId}`;
+    }
+    const [round] = await sql<{ group_shape: string | null }>`select group_shape from rounds where id = ${data.roundId}`;
+    const shape = asShape(data.shape ?? round?.group_shape);
+    const sizes = SHAPE_SIZES[shape];
     const players = await sql<{ id: number }>`select id from players`;
     const shuffled = [...players].sort(() => Math.random() - 0.5).map((p) => p.id);
     const groups = await sql<{ id: number; locked: boolean }>`
-      select id, locked from groups where round_id = ${data.roundId} and group_number <= 3 order by group_number
+      select id, locked from groups where round_id = ${data.roundId} and group_number <= ${MAX_GROUPS} order by group_number
     `;
-    const sizes = [4, 3, 3];
     let i = 0;
     for (const [gi, g] of groups.entries()) {
       if (g.locked) continue;
       await sql`delete from group_players where group_id = ${g.id}`;
-      const slice = shuffled.slice(i, i + (sizes[gi] ?? 3));
-      i += sizes[gi] ?? 3;
+      const take = sizes[gi] ?? 0;
+      const slice = take ? shuffled.slice(i, i + take) : [];
+      i += take;
       for (const [pos, pid] of slice.entries()) {
         await sql`
           insert into group_players (group_id, player_id, position) values (${g.id}, ${pid}, ${pos})
@@ -343,7 +376,7 @@ export const randomizePairings = createServerFn({ method: "POST" })
       }
     }
     const msg = await setMomMessage(sql, "Seth made another spreadsheet decision.");
-    await audit(sql, context.userId, "randomize_pairings", "round", data.roundId);
+    await audit(sql, context.userId, "randomize_pairings", "round", data.roundId, { shape });
     return { ok: true, message: msg };
   });
 
@@ -359,16 +392,24 @@ export const copyPrevPairings = createServerFn({ method: "POST" })
       select id from rounds where round_number = ${round.round_number - 1} limit 1
     `;
     if (!prev) throw new Error("No previous round.");
-    const prevGroups = await sql<{ id: number; group_number: number }>`
-      select id, group_number from groups where round_id = ${prev.id} and group_number <= 3
+    await ensureRoundGroups(sql, data.roundId);
+    await ensureRoundGroups(sql, prev.id);
+    const prevGroups = await sql<{
+      id: number;
+      group_number: number;
+      format: string | null;
+      tee_time: string | null;
+    }>`
+      select id, group_number, format, tee_time from groups where round_id = ${prev.id} and group_number <= ${MAX_GROUPS}
     `;
     const nextGroups = await sql<{ id: number; group_number: number }>`
-      select id, group_number from groups where round_id = ${data.roundId} and group_number <= 3
+      select id, group_number from groups where round_id = ${data.roundId} and group_number <= ${MAX_GROUPS}
     `;
     for (const ng of nextGroups) {
       await sql`delete from group_players where group_id = ${ng.id}`;
       const pg = prevGroups.find((g) => g.group_number === ng.group_number);
       if (!pg) continue;
+      await sql`update groups set format = ${pg.format}, tee_time = ${pg.tee_time} where id = ${ng.id}`;
       const members = await sql<{ player_id: number; position: number }>`
         select player_id, position from group_players where group_id = ${pg.id}
       `;
@@ -448,11 +489,13 @@ export const publishPairings = createServerFn({ method: "POST" })
         const p = players.find((pl) => pl.id === m.player_id);
         return p ? playerName(p) : "Unknown";
       });
-      const match = await sql<{ a1: number; a2: number; b1: number; b2: number }>`
+      const match = await sql<{ a1: number; a2: number | null; b1: number | null; b2: number | null }>`
         select a1, a2, b1, b2 from matches where round_id = ${data.roundId} and group_id = ${g.id} limit 1
       `;
       const matchLine = match[0]
-        ? `${nameOf(players, match[0].a1)} / ${nameOf(players, match[0].a2)} vs. ${nameOf(players, match[0].b1)} / ${nameOf(players, match[0].b2)}`
+        ? [match[0].a1, match[0].a2].filter(Boolean).length
+          ? `${nameOf(players, match[0].a1)}${match[0].a2 ? ` / ${nameOf(players, match[0].a2)}` : ""} vs. ${nameOf(players, match[0].b1 ?? 0)}${match[0].b2 ? ` / ${nameOf(players, match[0].b2)}` : ""}`
+          : undefined
         : undefined;
       for (const m of members) {
         if (before.length && !changed.has(m.player_id)) continue;
@@ -500,27 +543,46 @@ export const createMatch = createServerFn({ method: "POST" })
     z.object({
       roundId: z.number(),
       groupId: z.number().nullable(),
+      kind: z.enum(["group", "inter"]).optional(),
+      format: z.enum(ROUND_FORMATS).optional(),
       a1: z.number(),
-      a2: z.number(),
-      b1: z.number(),
-      b2: z.number(),
+      a2: z.number().nullable().optional(),
+      b1: z.number().nullable().optional(),
+      b2: z.number().nullable().optional(),
     }),
   )
   .handler(async ({ context, data }) => {
     const sql = await withDb();
     const ident = await userEmail(sql, context.userId);
     await requireAdmin(sql, context.userId, ident.email);
-    const ids = [data.a1, data.a2, data.b1, data.b2];
-    if (new Set(ids).size !== 4) throw new Error("Four different golfers, please.");
+    const format = asFormat(data.format);
+    const kind = asKind(data.kind, data.groupId == null ? "inter" : "group");
+    const ids = [data.a1, data.a2, data.b1, data.b2].filter((id): id is number => id != null);
+    if (format === "wolf") {
+      if (ids.length !== 3 || new Set(ids).size !== 3) throw new Error("Wolf is three golfers.");
+    } else if (ids.length === 2 && new Set(ids).size === 2) {
+      // pair vs the field — they play this game on the intergroup board
+    } else if (ids.length !== 4 || new Set(ids).size !== 4) {
+      throw new Error("Need a pair, or two pairs.");
+    }
     const [trip] = await sql<{ match_stake: string | number | null }>`select match_stake from trips order by id limit 1`;
     const stake = num(trip?.match_stake, DEFAULT_MATCH_STAKE);
+    const groupId = kind === "inter" ? null : data.groupId;
+    if (groupId && kind === "group") {
+      await sql`delete from matches where group_id = ${groupId} and coalesce(kind, 'group') = 'group'`;
+      await sql`update groups set format = ${format} where id = ${groupId}`;
+    }
     const [row] = await sql<{ id: number }>`
-      insert into matches (round_id, group_id, a1, a2, b1, b2, status, stake, bet_status)
-      values (${data.roundId}, ${data.groupId}, ${data.a1}, ${data.a2}, ${data.b1}, ${data.b2}, 'pending', ${stake}, 'open')
+      insert into matches (round_id, group_id, kind, format, a1, a2, b1, b2, status, stake, bet_status)
+      values (
+        ${data.roundId}, ${groupId}, ${kind}, ${format},
+        ${data.a1}, ${data.a2 ?? null}, ${data.b1 ?? null}, ${data.b2 ?? null},
+        'pending', ${stake}, 'open'
+      )
       returning id
     `;
     await refreshMatches(sql, data.roundId);
-    await audit(sql, context.userId, "create_match", "match", row.id);
+    await audit(sql, context.userId, "create_match", "match", row.id, { format, kind });
     return { id: row.id };
   });
 
@@ -544,7 +606,182 @@ export const autoMatches = createServerFn({ method: "POST" })
     await requireAdmin(sql, context.userId, ident.email);
     await ensureFoursomeMatches(sql, data.roundId);
     await refreshMatches(sql, data.roundId);
-    return { ok: true, message: "2v2 net matches posted for every foursome. Partnerships remain temporary." };
+    return { ok: true, message: "Tee-time games posted. Inter-tee matches stay put." };
+  });
+
+export const setRoundFormat = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    z.object({
+      roundId: z.number(),
+      format: z.enum(ROUND_FORMATS),
+    }),
+  )
+  .handler(async ({ context, data }) => {
+    const sql = await withDb();
+    const ident = await userEmail(sql, context.userId);
+    await requireAdmin(sql, context.userId, ident.email);
+    const format = asFormat(data.format);
+    await sql`
+      update rounds set format = ${format}, allowance_pct = ${allowanceForFormat(format)}
+      where id = ${data.roundId}
+    `;
+    await freezeHandicaps(sql, data.roundId);
+    await audit(sql, context.userId, "set_round_format", "round", data.roundId, { format });
+    return { ok: true as const, format };
+  });
+
+export const setGroupShape = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(z.object({ roundId: z.number(), shape: z.enum(["foursomes", "pairs"]) }))
+  .handler(async ({ context, data }) => {
+    const sql = await withDb();
+    const ident = await userEmail(sql, context.userId);
+    await requireAdmin(sql, context.userId, ident.email);
+    const shape = asShape(data.shape);
+    await ensureRoundGroups(sql, data.roundId);
+    await sql`update rounds set group_shape = ${shape} where id = ${data.roundId}`;
+    await audit(sql, context.userId, "set_group_shape", "round", data.roundId, { shape });
+    return { ok: true as const, shape };
+  });
+
+export const setGroupFormat = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(z.object({ groupId: z.number(), format: z.enum(ROUND_FORMATS) }))
+  .handler(async ({ context, data }) => {
+    const sql = await withDb();
+    const ident = await userEmail(sql, context.userId);
+    await requireAdmin(sql, context.userId, ident.email);
+    const format = asFormat(data.format);
+    await sql`update groups set format = ${format} where id = ${data.groupId}`;
+    await audit(sql, context.userId, "set_group_format", "group", data.groupId, { format });
+    return { ok: true as const, format };
+  });
+
+export const setGroupTeeTime = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(z.object({ groupId: z.number(), teeTime: z.string().max(32) }))
+  .handler(async ({ context, data }) => {
+    const sql = await withDb();
+    const ident = await userEmail(sql, context.userId);
+    await requireAdmin(sql, context.userId, ident.email);
+    const teeTime = data.teeTime.trim() || null;
+    await sql`update groups set tee_time = ${teeTime} where id = ${data.groupId}`;
+    return { ok: true as const, teeTime };
+  });
+
+export const enterTeamScore = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    z.object({
+      roundId: z.number(),
+      matchId: z.number(),
+      side: z.enum(["A", "B"]),
+      hole: z.number().int().min(1).max(18),
+      gross: z.number().int().min(1).max(15),
+    }),
+  )
+  .handler(async ({ context, data }) => {
+    const sql = await withDb();
+    const ident = await userEmail(sql, context.userId);
+    const me = await playerByUser(sql, context.userId, ident.email);
+    if (!me) throw new Error("Claim a bag first.");
+    const [match] = await sql<{
+      a1: number;
+      a2: number | null;
+      b1: number | null;
+      b2: number | null;
+    }>`select a1, a2, b1, b2 from matches where id = ${data.matchId}`;
+    if (!match) throw new Error("Match not found");
+    const ids = [match.a1, match.a2, match.b1, match.b2];
+    if (me.role !== "admin" && !ids.includes(me.id)) throw new Error("Not your match.");
+    return saveTeamGross(sql, data.roundId, data.matchId, data.side, data.hole, data.gross);
+  });
+
+export const saveWolfPick = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    z.object({
+      roundId: z.number(),
+      groupId: z.number(),
+      hole: z.number().int().min(1).max(18),
+      partnerId: z.number().nullable(),
+      lone: z.boolean(),
+    }),
+  )
+  .handler(async ({ context, data }) => {
+    const sql = await withDb();
+    const ident = await userEmail(sql, context.userId);
+    const me = await playerByUser(sql, context.userId, ident.email);
+    if (!me) throw new Error("Claim a bag first.");
+    const members = await sql<{ player_id: number }>`
+      select player_id from group_players where group_id = ${data.groupId} order by position
+    `;
+    const [posted] = await sql<{ a1: number; a2: number | null; b1: number | null }>`
+      select a1, a2, b1 from matches
+      where round_id = ${data.roundId} and group_id = ${data.groupId} and coalesce(kind, 'group') = 'group'
+      limit 1
+    `;
+    const ids = posted
+      ? [posted.a1, posted.a2, posted.b1].filter((id): id is number => id != null)
+      : members.map((m) => m.player_id);
+    if (me.role !== "admin" && !ids.includes(me.id)) throw new Error("Not your group.");
+    const { wolfOfHole } = await import("@/lib/golf/formats");
+    const wolfId = wolfOfHole(ids, data.hole);
+    if (me.role !== "admin" && me.id !== wolfId) throw new Error("Only the Wolf picks.");
+    if (data.partnerId && !ids.includes(data.partnerId)) throw new Error("Partner has to be in the group.");
+    if (data.partnerId === wolfId) throw new Error("The Wolf cannot partner with the Wolf.");
+    await sql`
+      insert into wolf_picks (round_id, group_id, hole_number, wolf_player_id, partner_player_id, lone)
+      values (${data.roundId}, ${data.groupId}, ${data.hole}, ${wolfId}, ${data.lone ? null : data.partnerId}, ${data.lone})
+      on conflict (round_id, group_id, hole_number)
+      do update set partner_player_id = excluded.partner_player_id, lone = excluded.lone, wolf_player_id = excluded.wolf_player_id
+    `;
+    await refreshMatches(sql, data.roundId);
+    return { ok: true as const };
+  });
+
+export const saveVegasSplit = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    z.object({
+      roundId: z.number(),
+      groupId: z.number(),
+      hole: z.number().int().min(1).max(18),
+      a1: z.number(),
+      a2: z.number(),
+      b1: z.number(),
+      b2: z.number(),
+    }),
+  )
+  .handler(async ({ context, data }) => {
+    const sql = await withDb();
+    const ident = await userEmail(sql, context.userId);
+    const me = await playerByUser(sql, context.userId, ident.email);
+    if (!me) throw new Error("Claim a bag first.");
+    const members = await sql<{ player_id: number }>`
+      select player_id from group_players where group_id = ${data.groupId} order by position
+    `;
+    const [posted] = await sql<{ a1: number; a2: number | null; b1: number | null; b2: number | null }>`
+      select a1, a2, b1, b2 from matches
+      where round_id = ${data.roundId} and group_id = ${data.groupId} and coalesce(kind, 'group') = 'group'
+      limit 1
+    `;
+    const ids = posted
+      ? [posted.a1, posted.a2, posted.b1, posted.b2].filter((id): id is number => id != null)
+      : members.map((m) => m.player_id);
+    if (me.role !== "admin" && !ids.includes(me.id)) throw new Error("Not your tee time.");
+    const split = [data.a1, data.a2, data.b1, data.b2];
+    if (new Set(split).size !== 4) throw new Error("Four different golfers.");
+    if (split.some((id) => !ids.includes(id))) throw new Error("Those four have to be in this tee time.");
+    await sql`
+      insert into vegas_splits (round_id, group_id, hole_number, a1, a2, b1, b2)
+      values (${data.roundId}, ${data.groupId}, ${data.hole}, ${data.a1}, ${data.a2}, ${data.b1}, ${data.b2})
+      on conflict (round_id, group_id, hole_number)
+      do update set a1 = excluded.a1, a2 = excluded.a2, b1 = excluded.b1, b2 = excluded.b2
+    `;
+    await refreshMatches(sql, data.roundId);
+    return { ok: true as const };
   });
 
 export const updatePlayer = createServerFn({ method: "POST" })

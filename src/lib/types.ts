@@ -65,6 +65,10 @@ export type Hole = {
   stroke_index: number;
 };
 
+export type RoundFormat = "fourball" | "alternate" | "scramble" | "wolf" | "vegas";
+export type GroupShape = "foursomes" | "pairs";
+export type MatchKind = "group" | "inter";
+
 export type Round = {
   id: number;
   course_id: number;
@@ -78,6 +82,8 @@ export type Round = {
   status: "upcoming" | "live" | "finalized";
   pairings_status: "draft" | "published";
   allowance_pct: number;
+  format: RoundFormat;
+  group_shape: GroupShape;
   course_name: string;
   course_slug: string;
   course_image: string | null;
@@ -87,10 +93,12 @@ export type MatchRow = {
   id: number;
   round_id: number;
   group_id: number | null;
+  kind: MatchKind;
+  format: RoundFormat;
   a1: number;
-  a2: number;
-  b1: number;
-  b2: number;
+  a2: number | null;
+  b1: number | null;
+  b2: number | null;
   status: string;
   result: string | null;
   winner_side: string | null;
