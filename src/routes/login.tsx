@@ -52,10 +52,9 @@ function Login() {
         <div className="panel p-5">
           <h2 className="font-display text-2xl">Sign in</h2>
           <p className="mb-4 text-sm text-muted">
-            Claim a bag with Google, X, or email. Or walk the grounds as a guest — scores, pairings, and the ledger are
-            visible. Scoring and Seth Mode still require an account.
+            Use email and a password, or walk the grounds as a guest. Scoring and Seth Mode still need an account.
           </p>
-          {authEnabled ? (
+          {authEnabled && GROK_PROVIDERS.length > 0 ? (
             <div className="space-y-2">
               {GROK_PROVIDERS.map((p) => (
                 <Button
@@ -69,13 +68,11 @@ function Login() {
                 </Button>
               ))}
             </div>
-          ) : (
-            <p className="text-sm text-muted">Sign-in is disabled.</p>
-          )}
+          ) : null}
           <Button
             type="button"
             variant="ghost"
-            className="mt-2 w-full"
+            className="w-full"
             onClick={() => {
               enterGuestMode();
               void navigate({ to: "/" });
