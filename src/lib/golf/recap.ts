@@ -1,5 +1,6 @@
 import { deriveStats, type Bootstrap } from "@/lib/golf/derive";
 import { playerName } from "@/lib/utils";
+import { forceParagraphs } from "@/lib/golf/paragraphs";
 
 export type RecapDraft = {
   day: string;
@@ -7,6 +8,8 @@ export type RecapDraft = {
   body: string;
   quote: string;
 };
+
+export { forceParagraphs };
 
 function nameOf(data: Bootstrap, id: number | null | undefined): string {
   if (id == null) return "nobody";
@@ -139,21 +142,6 @@ export function fakeQuotes(facts: ReturnType<typeof recapFacts>): string[] {
   return picks.map((d, i) => bank[i % bank.length](d));
 }
 
-export function forceParagraphs(body: string): string {
-  const cleaned = body.replace(/\r\n/g, "\n").trim();
-  const existing = cleaned.split(/\n\s*\n/).map((p) => p.replace(/\s+/g, " ").trim()).filter(Boolean);
-  if (existing.length >= 4) return existing.join("\n\n");
-  const sentences = cleaned
-    .replace(/\n+/g, " ")
-    .split(/(?<=[.!?"])\s+(?=[A-Z0-9])/)n    .map((s) => s.trim())
-    .filter(Boolean);
-  const chunks: string[] = [];
-  for (let i = 0; i < sentences.length; i += 2) {
-    chunks.push(sentences.slice(i, i + 2).join(" "));
-  }
-  return (chunks.length ? chunks : existing).join("\n\n");
-}
-
 export function templateRecap(data: Bootstrap, day: string, weather?: string): RecapDraft {
   const f = recapFacts(data, day);
   const weekday = new Date(`${day}T12:00:00`).toLocaleDateString("en-US", {
@@ -205,7 +193,7 @@ Be ridiculously funny. Profanity is fine (shit, damn, hell, ass, bastard). No sl
 
 NEVER invent scores or hole numbers. disasters[] are the only blow-up holes you may quote. Weave 2-3 fake cart quotes into the story. Not a quote list.
 
-FORMAT IS MANDATORY: 5 to 7 SHORT paragraphs. Each paragraph is 1-3 sentences. Separate every paragraph with a blank line (\\n\\n). No walls of text. No bullets.
+FORMAT IS MANDATORY: 5 to 7 SHORT paragraphs. Each paragraph is 1-3 sentences. Separate every paragraph with a blank line. No walls of text. No bullets.
 
 Order:
 1) Where they played and how many cards
