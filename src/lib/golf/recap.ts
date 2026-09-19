@@ -139,6 +139,21 @@ export function fakeQuotes(facts: ReturnType<typeof recapFacts>): string[] {
   return picks.map((d, i) => bank[i % bank.length](d));
 }
 
+export function forceParagraphs(body: string): string {
+  const cleaned = body.replace(/\r\n/g, "\n").trim();
+  const existing = cleaned.split(/\n\s*\n/).map((p) => p.replace(/\s+/g, " ").trim()).filter(Boolean);
+  if (existing.length >= 4) return existing.join("\n\n");
+  const sentences = cleaned
+    .replace(/\n+/g, " ")
+    .split(/(?<=[.!?"])\s+(?=[A-Z0-9])/)n    .map((s) => s.trim())
+    .filter(Boolean);
+  const chunks: string[] = [];
+  for (let i = 0; i < sentences.length; i += 2) {
+    chunks.push(sentences.slice(i, i + 2).join(" "));
+  }
+  return (chunks.length ? chunks : existing).join("\n\n");
+}
+
 export function templateRecap(data: Bootstrap, day: string, weather?: string): RecapDraft {
   const f = recapFacts(data, day);
   const weekday = new Date(`${day}T12:00:00`).toLocaleDateString("en-US", {
@@ -149,9 +164,19 @@ export function templateRecap(data: Bootstrap, day: string, weather?: string): R
   });
   const courseLine = f.rounds.map((r) => r.course).join(" then ") || "whatever swamp Seth booked";
   const quotes = fakeQuotes(f);
-  const p1 = `${weekday} at ${courseLine}. ${f.posted} of ${f.field} grown men turned in a card. ${f.lowGross ? `Low gross is ${f.lowGross.name} at ${f.lowGross.score}, which is either impressive or a crime against the index.` : "Nobody finished 18. Cowards."} ${f.skins ? `Skins sit with ${f.skins.name} (${f.skins.n}).` : "Skins are still arguing with themselves."} ${quotes[0] ?? ""}`;
-  const p2 = `${f.blowUp ? `The blow-up belongs to ${f.blowUp.name} and a ${f.blowUp.score}.` : ""} ${quotes[1] ?? ""} ${f.matches.length ? `Matches: ${f.matches.slice(0, 3).join("; ")}.` : "Match play is waiting on Seth like everything else."} ${f.askSeth ? `${f.askSeth.name} hit the Seth button ${f.askSeth.n} times like it was a mulligan.` : ""} ${quotes[2] ?? ""}`;
-  let upcoming = "No next round on the sheet. Go ice your lower back and lie to each other at dinner.";
+  const paras = [
+    `${weekday} at ${courseLine}. ${f.posted} of ${f.field} grown men turned in a card.`,
+    f.lowGross
+      ? `Low gross is ${f.lowGross.name} at ${f.lowGross.score}, which is either impressive or a crime against the index.`
+      : "Nobody finished 18. Cowards.",
+    f.skins ? `Skins sit with ${f.skins.name} (${f.skins.n}). Unique low. Ties pushed. Not a casino.` : "Skins are still arguing with themselves.",
+    quotes[0],
+    f.blowUp ? `The blow-up belongs to ${f.blowUp.name} and a ${f.blowUp.score}.` : "",
+    quotes[1],
+    f.matches.length ? `Matches: ${f.matches.slice(0, 3).join("; ")}.` : "Match play is waiting on Seth like everything else.",
+    quotes[2],
+    f.askSeth ? `${f.askSeth.name} hit the Seth button ${f.askSeth.n} times like it was a mulligan.` : "",
+  ].filter(Boolean) as string[];
   if (f.next) {
     const wx = weather ?? "Humidity with a chance of excuses.";
     const when = new Date(`${f.next.date}T12:00:00`).toLocaleDateString("en-US", {
@@ -160,16 +185,34 @@ export function templateRecap(data: Bootstrap, day: string, weather?: string): R
       day: "numeric",
       timeZone: "America/New_York",
     });
-    upcoming = `Coming up: ${f.next.name} at ${f.next.course}${f.next.teeTime ? `, ${f.next.teeTime}` : ""} on ${when}. Weather desk: ${wx} Stretch something that is not your index.`;
+    paras.push(`Coming up: ${f.next.name} at ${f.next.course}${f.next.teeTime ? `, ${f.next.teeTime}` : ""} on ${when}.`);
+    paras.push(`Weather desk: ${wx} Stretch something that is not your index.`);
+  } else {
+    paras.push("No next round on the sheet. Go ice your lower back and lie to each other at dinner.");
   }
   return {
     day,
     title: `${weekday.split(",")[0]} Recap - Young Gunz Orlando`,
-    body: [p1, p2, upcoming].map((s) => s.replace(/\s+/g, " ").trim()).join("\n\n"),
+    body: forceParagraphs(paras.join("\n\n")),
     quote: quotes[0] ?? "Ten middle-aged men. One itinerary. Zero shame.",
   };
 }
 
 export function recapSystemPrompt(): string {
-  return `You write the Young Gunz Orlando 2026 recap. Ten white middle-aged guys on a golf trip who like each other, drink, and talk shit. You are the drunk uncle commissioner with a press pass.\n\nBe ridiculously funny. Profanity is fine (shit, damn, hell, ass, bastard). No slurs. No punching down on anyone's body, wife, kids, or job. Roast the golf and the excuses.\n\nNEVER invent scores or hole numbers. disasters[] are the only blow-up holes you may quote. Weave 2-3 fake-but-in-character quotes INTO the paragraphs (not a bullet list). Quotes should sound like guys on a cart: "that's good," "wind," "never happens at home," blaming the green, the beer, Seth.\n\nStructure:\n- Para 1: what happened today + first quote in the flow\n- Para 2: more bodies, matches/skins, another quote or two woven in\n- Para 3: Coming up next round + the weather string with a jab about tee times, humidity, carts, or Seth\n\nReturn JSON only: {"title":"...","body":"...","quote":"..."}. Body uses \\n\\n between the three paragraphs. Quote field is the single best line.`;
+  return `You write the Young Gunz Orlando 2026 recap. Ten white middle-aged guys on a golf trip who like each other, drink, and talk shit. You are the drunk uncle commissioner with a press pass.
+
+Be ridiculously funny. Profanity is fine (shit, damn, hell, ass, bastard). No slurs. No punching down on anyone's body, wife, kids, or job. Roast the golf and the excuses.
+
+NEVER invent scores or hole numbers. disasters[] are the only blow-up holes you may quote. Weave 2-3 fake cart quotes into the story. Not a quote list.
+
+FORMAT IS MANDATORY: 5 to 7 SHORT paragraphs. Each paragraph is 1-3 sentences. Separate every paragraph with a blank line (\\n\\n). No walls of text. No bullets.
+
+Order:
+1) Where they played and how many cards
+2) Low gross / skins
+3) A quote baked into a blow-up
+4) Matches or another quote
+5) Coming up + weather jab
+
+Return JSON only: {"title":"...","body":"...","quote":"..."}.`;
 }
