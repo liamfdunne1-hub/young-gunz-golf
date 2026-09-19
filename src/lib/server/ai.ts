@@ -1,5 +1,4 @@
-import { recapSystemPrompt, templateRecap, type RecapDraft } from "@/lib/golf/recap";
-import { recapFacts } from "@/lib/golf/recap";
+import { recapSystemPrompt, templateRecap, orlandoWeather, recapFacts, type RecapDraft } from "@/lib/golf/recap";
 import type { Bootstrap } from "@/lib/golf/derive";
 
 const MODELS = ["grok-3-mini", "grok-3", "grok-2-latest"];
@@ -27,11 +26,11 @@ export async function writeRecapWithAi(
   day: string,
   apiKey: string | null,
 ): Promise<{ draft: RecapDraft; usedAi: boolean }> {
-  const fallback = templateRecap(data, day);
+  const facts = recapFacts(data, day);
+  const weather = facts.next ? await orlandoWeather(facts.next.date) : undefined;
+  const fallback = templateRecap(data, day, weather);
   const key = apiKey?.trim();
   if (!key) return { draft: fallback, usedAi: false };
-
-  const facts = recapFacts(data, day);
   let lastError = "";
   for (const model of MODELS) {
     try {
@@ -46,7 +45,7 @@ export async function writeRecapWithAi(
           temperature: 0.7,
           messages: [
             { role: "system", content: recapSystemPrompt() },
-            { role: "user", content: JSON.stringify(facts) },
+            { role: "user", content: JSON.stringify({ ...facts, weather }) },
           ],
         }),
       });
