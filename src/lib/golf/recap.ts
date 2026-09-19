@@ -110,27 +110,32 @@ export async function orlandoWeather(isoDate: string): Promise<string> {
     const code = json.daily?.weathercode?.[0];
     const sky =
       code != null && code >= 80
-        ? "storms looking for a backswing"
+        ? "pop-up storms hunting mid-handicaps"
         : code != null && code >= 61
-          ? "rain with a personal vendetta"
+          ? "rain that will be blamed on the guy who washed his ball"
           : code != null && code >= 1
-            ? "clouds that will be blamed for everything"
-            : "cruel, photogenic sun";
-    if (hi == null) return "Orlando will be humid. This is not news.";
-    return `${Math.round(lo ?? hi)}\u2013${Math.round(hi)}\u00b0F, ${sky}${rain && rain >= 30 ? `, ${rain}% chance it rains on the guy who left his cover in the cart` : ""}.`;
+            ? "clouds, excuses, and a 2pm beer"
+            : "that bright Florida bastard of a sun";
+    if (hi == null) return "Orlando will be humid enough to steam a brat.";
+    return `${Math.round(lo ?? hi)}-${Math.round(hi)}F, ${sky}${rain && rain >= 30 ? `, ${rain}% chance it soaks the idiot who left his cover in the cart` : ""}.`;
   } catch {
-    return "Forecast unavailable. Assume humidity, bad decisions, and someone asking if that is a water hazard.";
+    return "Forecast desk is drunk. Assume humidity, a breeze that only exists after a snap-hook, and someone asking if that's a water hazard.";
   }
 }
 
 export function fakeQuotes(facts: ReturnType<typeof recapFacts>): string[] {
   const bank = [
-    (d: { name: string; hole: number; gross: number }) => `${d.name}, after a ${d.gross} on ${d.hole}: \u201cThat green is illegal.\u201d`,
-    (d: { name: string; hole: number; gross: number }) => `${d.name} on ${d.hole}: \u201cI flushed it.\u201d The card says ${d.gross}.`,
-    (d: { name: string; hole: number; gross: number }) => `${d.name}, walking off ${d.hole}: \u201cWind.\u201d There was no wind. There was a ${d.gross}.`,
+    (d: { name: string; hole: number; gross: number }) =>
+      `${d.name} walked off ${d.hole} after a ${d.gross} and said, "That pin is a war crime." Nobody argued. The card already had.`,
+    (d: { name: string; hole: number; gross: number }) =>
+      `${d.name} flushed a provisional on ${d.hole}, posted a ${d.gross}, and muttered, "That's good." It was not good.`,
+    (d: { name: string; hole: number; gross: number }) =>
+      `On ${d.hole} ${d.name} announced "wind" after a ${d.gross}. There was no wind. There was beer. There was a ${d.gross}.`,
   ];
   const picks = facts.disasters.slice(0, 3);
-  if (!picks.length && facts.blowUp) return [`${facts.blowUp.name}, probably: \u201cThat never happens at my home course.\u201d`];
+  if (!picks.length && facts.blowUp) {
+    return [`${facts.blowUp.name} looked at a ${facts.blowUp.score} and said, "That never happens at my home course." Home course is a myth they tell their wives.`];
+  }
   return picks.map((d, i) => bank[i % bank.length](d));
 }
 
@@ -142,22 +147,11 @@ export function templateRecap(data: Bootstrap, day: string, weather?: string): R
     day: "numeric",
     timeZone: "America/New_York",
   });
-  const courseLine = f.rounds.map((r) => r.course).join(" then ") || "a course Seth has not named";
-  const lines: string[] = [];
-  lines.push(`${weekday} at ${courseLine}. ${f.posted} of ${f.field} cards in. Journalism continues, unfortunately.`);
-  if (f.lowGross) lines.push(`Low gross on file: ${f.lowGross.name} (${f.lowGross.score}). The Handicap Committee has been copied.`);
-  else lines.push("Nobody has finished 18 holes yet. The record book is yawning.");
-  if (f.lowNet) lines.push(`Net honors: ${f.lowNet.name}. USGA 90% did some work.`);
-  if (f.birdies) lines.push(`Birdie leader ${f.birdies.name} with ${f.birdies.n}.`);
-  if (f.skins) lines.push(`Skins: ${f.skins.name} has ${f.skins.n}. Unique low. Ties pushed.`);
-  if (f.blowUp) lines.push(`Blow-up of the day belongs to ${f.blowUp.name} with a ${f.blowUp.score}.`);
-  if (f.matches.length) lines.push(`Matches: ${f.matches.slice(0, 4).join("; ")}.`);
-  if (f.askSeth) lines.push(`${f.askSeth.name} asked Seth ${f.askSeth.n} times.`);
+  const courseLine = f.rounds.map((r) => r.course).join(" then ") || "whatever swamp Seth booked";
   const quotes = fakeQuotes(f);
-  if (quotes.length) {
-    lines.push("Unofficial quotes the desk is treating as on the record:");
-    for (const q of quotes) lines.push(q);
-  }
+  const p1 = `${weekday} at ${courseLine}. ${f.posted} of ${f.field} grown men turned in a card. ${f.lowGross ? `Low gross is ${f.lowGross.name} at ${f.lowGross.score}, which is either impressive or a crime against the index.` : "Nobody finished 18. Cowards."} ${f.skins ? `Skins sit with ${f.skins.name} (${f.skins.n}).` : "Skins are still arguing with themselves."} ${quotes[0] ?? ""}`;
+  const p2 = `${f.blowUp ? `The blow-up belongs to ${f.blowUp.name} and a ${f.blowUp.score}.` : ""} ${quotes[1] ?? ""} ${f.matches.length ? `Matches: ${f.matches.slice(0, 3).join("; ")}.` : "Match play is waiting on Seth like everything else."} ${f.askSeth ? `${f.askSeth.name} hit the Seth button ${f.askSeth.n} times like it was a mulligan.` : ""} ${quotes[2] ?? ""}`;
+  let upcoming = "No next round on the sheet. Go ice your lower back and lie to each other at dinner.";
   if (f.next) {
     const wx = weather ?? "Humidity with a chance of excuses.";
     const when = new Date(`${f.next.date}T12:00:00`).toLocaleDateString("en-US", {
@@ -166,22 +160,16 @@ export function templateRecap(data: Bootstrap, day: string, weather?: string): R
       day: "numeric",
       timeZone: "America/New_York",
     });
-    lines.push(`Coming up: ${f.next.name} at ${f.next.course}${f.next.teeTime ? `, ${f.next.teeTime}` : ""}. ${when}. Weather: ${wx} Pack sunscreen and a better attitude.`);
-  } else {
-    lines.push("No next round on the sheet. Either you survived the trip or Seth has not updated the itinerary.");
+    upcoming = `Coming up: ${f.next.name} at ${f.next.course}${f.next.teeTime ? `, ${f.next.teeTime}` : ""} on ${when}. Weather desk: ${wx} Stretch something that is not your index.`;
   }
   return {
     day,
-    title: `${weekday.split(",")[0]} Recap \u2014 Young Gunz Orlando`,
-    body: lines.join("\n\n"),
-    quote: quotes[0] ?? "Ten golfers. Zero accountability. The website is doing its best.",
+    title: `${weekday.split(",")[0]} Recap - Young Gunz Orlando`,
+    body: [p1, p2, upcoming].map((s) => s.replace(/\s+/g, " ").trim()).join("\n\n"),
+    quote: quotes[0] ?? "Ten middle-aged men. One itinerary. Zero shame.",
   };
 }
 
 export function recapSystemPrompt(): string {
-  return `You are the official recap desk for Young Gunz Orlando 2026, a 10-man golf trip.
-Voice: dry, absurd, ESPN-meets-commissioner. Personalized. Never invent scores or hole numbers.
-Facts in the user JSON are the only numbers you may use. disasters[] are real blow-up holes. weather is a string if present.
-Write two short paragraphs on today, two or three funny unofficial quotes tied to named golfers and real disaster holes, then a Coming up blurb with the weather string and a jab.
-Return JSON only: {"title":"...","body":"...","quote":"..."}. Body uses \\n\\n between paragraphs.`;
+  return `You write the Young Gunz Orlando 2026 recap. Ten white middle-aged guys on a golf trip who like each other, drink, and talk shit. You are the drunk uncle commissioner with a press pass.\n\nBe ridiculously funny. Profanity is fine (shit, damn, hell, ass, bastard). No slurs. No punching down on anyone's body, wife, kids, or job. Roast the golf and the excuses.\n\nNEVER invent scores or hole numbers. disasters[] are the only blow-up holes you may quote. Weave 2-3 fake-but-in-character quotes INTO the paragraphs (not a bullet list). Quotes should sound like guys on a cart: "that's good," "wind," "never happens at home," blaming the green, the beer, Seth.\n\nStructure:\n- Para 1: what happened today + first quote in the flow\n- Para 2: more bodies, matches/skins, another quote or two woven in\n- Para 3: Coming up next round + the weather string with a jab about tee times, humidity, carts, or Seth\n\nReturn JSON only: {"title":"...","body":"...","quote":"..."}. Body uses \\n\\n between the three paragraphs. Quote field is the single best line.`;
 }
