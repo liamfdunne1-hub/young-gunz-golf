@@ -1,22 +1,38 @@
+type HoleBit = { name: string; hole: number; gross: number };
+
 type RecapBits = {
-  disasters: { name: string; hole: number; gross: number }[];
+  disasters: HoleBit[];
+  heroes?: HoleBit[];
   blowUp: { name: string; score: number | null } | null;
 };
 
 export function fakeQuotes(facts: RecapBits): string[] {
-  const bank = [
-    (d: { name: string; hole: number; gross: number }) =>
-      `${d.name} walked off ${d.hole} with a ${d.gross} looking like he'd been caught. "That pin is bullshit," he said. The pin was innocent. ${d.name} was not.`,
-    (d: { name: string; hole: number; gross: number }) =>
-      `${d.name} flushed a provisional on ${d.hole}, posted a ${d.gross}, and muttered "that's good." Nobody conceded shit.`,
-    (d: { name: string; hole: number; gross: number }) =>
-      `On ${d.hole} ${d.name} blamed "wind" after a ${d.gross}. There was no wind. There was a beer and a snap-hook.`,
-  ];
-  const picks = facts.disasters.slice(0, 3);
-  if (!picks.length && facts.blowUp) {
-    return [
-      `${facts.blowUp.name} stared at a ${facts.blowUp.score} and said it never happens at his home course. Home course is a fairy tale after the third IPA.`,
-    ];
+  const out: string[] = [];
+  const bad = facts.disasters[0];
+  const worse = facts.disasters[1];
+  const good = facts.heroes?.[0];
+  const jabber = facts.heroes?.[1]?.name || facts.disasters[2]?.name;
+
+  if (good) {
+    out.push(
+      `${good.name} on ${good.hole} after a ${good.gross}: "That's how a man hits it." He said this to nobody, then immediately three-putted the next one.`,
+    );
   }
-  return picks.map((d, i) => bank[i % bank.length](d));
+  if (bad) {
+    const speaker = jabber && jabber !== bad.name ? jabber : "the group";
+    out.push(
+      `${speaker} watching ${bad.name} post a ${bad.gross} on ${bad.hole}: "My mother-in-law could have gotten that airborne." ${bad.name} blamed the wind. There was no wind.`,
+    );
+  }
+  if (worse) {
+    out.push(
+      `${worse.name} on ${worse.hole} after a ${worse.gross}: "That's good." Nobody picked it up. The hole already had his balls in its pocket.`,
+    );
+  }
+  if (!out.length && facts.blowUp) {
+    out.push(
+      `${facts.blowUp.name} after a ${facts.blowUp.score}: "Never happens at home." Home is a rumor.`,
+    );
+  }
+  return out.slice(0, 3);
 }
