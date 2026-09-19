@@ -1,6 +1,8 @@
 import { deriveStats, type Bootstrap } from "@/lib/golf/derive";
 import { playerName } from "@/lib/utils";
 import { forceParagraphs } from "@/lib/golf/paragraphs";
+import { fakeQuotes } from "@/lib/golf/quotes";
+import { recapSystemPrompt as loudPrompt } from "@/lib/golf/voice";
 
 export type RecapDraft = {
   day: string;
@@ -9,7 +11,10 @@ export type RecapDraft = {
   quote: string;
 };
 
-export { forceParagraphs };
+export { forceParagraphs, fakeQuotes };
+export function recapSystemPrompt() {
+  return loudPrompt();
+}
 
 function nameOf(data: Bootstrap, id: number | null | undefined): string {
   if (id == null) return "nobody";
@@ -126,22 +131,6 @@ export async function orlandoWeather(isoDate: string): Promise<string> {
   }
 }
 
-export function fakeQuotes(facts: ReturnType<typeof recapFacts>): string[] {
-  const bank = [
-    (d: { name: string; hole: number; gross: number }) =>
-      `${d.name} walked off ${d.hole} after a ${d.gross} and said, "That pin is a war crime." Nobody argued. The card already had.`,
-    (d: { name: string; hole: number; gross: number }) =>
-      `${d.name} flushed a provisional on ${d.hole}, posted a ${d.gross}, and muttered, "That's good." It was not good.`,
-    (d: { name: string; hole: number; gross: number }) =>
-      `On ${d.hole} ${d.name} announced "wind" after a ${d.gross}. There was no wind. There was beer. There was a ${d.gross}.`,
-  ];
-  const picks = facts.disasters.slice(0, 3);
-  if (!picks.length && facts.blowUp) {
-    return [`${facts.blowUp.name} looked at a ${facts.blowUp.score} and said, "That never happens at my home course." Home course is a myth they tell their wives.`];
-  }
-  return picks.map((d, i) => bank[i % bank.length](d));
-}
-
 export function templateRecap(data: Bootstrap, day: string, weather?: string): RecapDraft {
   const f = recapFacts(data, day);
   const weekday = new Date(`${day}T12:00:00`).toLocaleDateString("en-US", {
@@ -153,17 +142,17 @@ export function templateRecap(data: Bootstrap, day: string, weather?: string): R
   const courseLine = f.rounds.map((r) => r.course).join(" then ") || "whatever swamp Seth booked";
   const quotes = fakeQuotes(f);
   const paras = [
-    `${weekday} at ${courseLine}. ${f.posted} of ${f.field} grown men turned in a card.`,
+    `${weekday} at ${courseLine}. ${f.posted} of ${f.field} grown-ass men turned in a card and immediately started lying.`,
     f.lowGross
-      ? `Low gross is ${f.lowGross.name} at ${f.lowGross.score}, which is either impressive or a crime against the index.`
+      ? `Low gross is ${f.lowGross.name} at ${f.lowGross.score}. Either he striped it or the rest of you played like hungover amateurs. Both can be true.`
       : "Nobody finished 18. Cowards.",
-    f.skins ? `Skins sit with ${f.skins.name} (${f.skins.n}). Unique low. Ties pushed. Not a casino.` : "Skins are still arguing with themselves.",
+    f.skins ? `Skins sit with ${f.skins.name} (${f.skins.n}). Unique low. Ties pushed. Not a casino, just ritual humiliation.` : "Skins are still arguing with themselves.",
     quotes[0],
-    f.blowUp ? `The blow-up belongs to ${f.blowUp.name} and a ${f.blowUp.score}.` : "",
+    f.blowUp ? `Biggest dumpster fire: ${f.blowUp.name} and a ${f.blowUp.score}. Hide the beers and the index.` : "",
     quotes[1],
-    f.matches.length ? `Matches: ${f.matches.slice(0, 3).join("; ")}.` : "Match play is waiting on Seth like everything else.",
+    f.matches.length ? `Matches: ${f.matches.slice(0, 3).join("; ")}.` : "Match play is waiting on Seth like a bar tab.",
     quotes[2],
-    f.askSeth ? `${f.askSeth.name} hit the Seth button ${f.askSeth.n} times like it was a mulligan.` : "",
+    f.askSeth ? `${f.askSeth.name} mashed the Seth button ${f.askSeth.n} times like it was a mulligan dispenser.` : "",
   ].filter(Boolean) as string[];
   if (f.next) {
     const wx = weather ?? "Humidity with a chance of excuses.";
@@ -174,9 +163,9 @@ export function templateRecap(data: Bootstrap, day: string, weather?: string): R
       timeZone: "America/New_York",
     });
     paras.push(`Coming up: ${f.next.name} at ${f.next.course}${f.next.teeTime ? `, ${f.next.teeTime}` : ""} on ${when}.`);
-    paras.push(`Weather desk: ${wx} Stretch something that is not your index.`);
+    paras.push(`Weather desk: ${wx} Ice the lower back. Stretch the ego.`)
   } else {
-    paras.push("No next round on the sheet. Go ice your lower back and lie to each other at dinner.");
+    paras.push("No next round on the sheet. Ice your lower back and lie to each other at dinner.");
   }
   return {
     day,
@@ -184,23 +173,4 @@ export function templateRecap(data: Bootstrap, day: string, weather?: string): R
     body: forceParagraphs(paras.join("\n\n")),
     quote: quotes[0] ?? "Ten middle-aged men. One itinerary. Zero shame.",
   };
-}
-
-export function recapSystemPrompt(): string {
-  return `You write the Young Gunz Orlando 2026 recap. Ten white middle-aged guys on a golf trip who like each other, drink, and talk shit. You are the drunk uncle commissioner with a press pass.
-
-Be ridiculously funny. Profanity is fine (shit, damn, hell, ass, bastard). No slurs. No punching down on anyone's body, wife, kids, or job. Roast the golf and the excuses.
-
-NEVER invent scores or hole numbers. disasters[] are the only blow-up holes you may quote. Weave 2-3 fake cart quotes into the story. Not a quote list.
-
-FORMAT IS MANDATORY: 5 to 7 SHORT paragraphs. Each paragraph is 1-3 sentences. Separate every paragraph with a blank line. No walls of text. No bullets.
-
-Order:
-1) Where they played and how many cards
-2) Low gross / skins
-3) A quote baked into a blow-up
-4) Matches or another quote
-5) Coming up + weather jab
-
-Return JSON only: {"title":"...","body":"...","quote":"..."}.`;
 }
