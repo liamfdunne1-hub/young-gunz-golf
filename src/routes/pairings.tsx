@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PlayerAvatar } from "@/components/avatar";
-import { useMeQuery, useTrip } from "@/lib/hooks";
+import { useTrip } from "@/lib/hooks";
 import { playerName } from "@/lib/utils";
 import {
   FORMAT_DETAIL,
@@ -18,7 +18,6 @@ export const Route = createFileRoute("/pairings")({ component: Pairings });
 
 function Pairings() {
   const { data, isPending } = useTrip();
-  const me = useMeQuery();
   if (isPending || !data) return <div className="h-40 animate-pulse rounded-[18px] bg-navy-2" />;
 
   return (
@@ -30,16 +29,9 @@ function Pairings() {
           Who you walk with is the tee time. The game inside it is separate from an inter-tee match. Vegas partners
           come from where the balls land, every hole.
         </p>
-        <div className="mt-2 flex flex-wrap gap-4">
-          {me.data?.isAdmin ? (
-            <Link to="/seth/pairings" className="text-sm text-gold">
-              Open pairings manager
-            </Link>
-          ) : null}
-          <Link to="/leaderboard" className="text-sm text-gold">
-            Intergroup board
-          </Link>
-        </div>
+        <Link to="/leaderboard" className="mt-2 inline-flex text-sm text-gold">
+          Intergroup board
+        </Link>
       </header>
       {data.rounds.map((round) => {
         const course = data.courses.find((c) => c.id === round.course_id);
