@@ -1,7 +1,7 @@
 import { recapSystemPrompt, templateRecap, orlandoWeather, recapFacts, type RecapDraft } from "@/lib/golf/recap";
 import type { Bootstrap } from "@/lib/golf/derive";
 
-const MODELS = ["grok-3-mini", "grok-3", "grok-2-latest"];
+const MODELS = ["grok-3", "grok-3-mini", "grok-2-latest"];
 
 function parseDraft(raw: string, fallback: RecapDraft): RecapDraft {
   const start = raw.indexOf("{");
@@ -12,9 +12,9 @@ function parseDraft(raw: string, fallback: RecapDraft): RecapDraft {
     if (!json.title || !json.body) return fallback;
     return {
       day: fallback.day,
-      title: String(json.title).slice(0, 120),
-      body: String(json.body).slice(0, 8000),
-      quote: String(json.quote ?? fallback.quote).slice(0, 280),
+      title: String(json.title).slice(0, 140),
+      body: String(json.body).slice(0, 10000),
+      quote: String(json.quote ?? fallback.quote).slice(0, 320),
     };
   } catch {
     return fallback;
@@ -42,7 +42,7 @@ export async function writeRecapWithAi(
         },
         body: JSON.stringify({
           model,
-          temperature: 0.7,
+          temperature: 1.05,
           messages: [
             { role: "system", content: recapSystemPrompt() },
             { role: "user", content: JSON.stringify({ ...facts, weather }) },
@@ -62,13 +62,7 @@ export async function writeRecapWithAi(
     }
   }
   if (lastError) {
-    return {
-      draft: {
-        ...fallback,
-        body: `${fallback.body}\n\n(The recap desk wrote this from the numbers. The AI key was present but the model did not answer.)`,
-      },
-      usedAi: false,
-    };
+    return { draft: fallback, usedAi: false };
   }
   return { draft: fallback, usedAi: false };
 }
