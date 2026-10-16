@@ -99,97 +99,45 @@ const WALDORF: Hole[] = [
 		si: 8
 	}
 ];
-const PALM: Hole[] = [
-	{
-		par: 4,
-		yards: 394,
-		si: 7
-	},
-	{
-		par: 4,
-		yards: 410,
-		si: 5
-	},
-	{
-		par: 3,
-		yards: 188,
-		si: 15
-	},
-	{
-		par: 5,
-		yards: 535,
-		si: 9
-	},
-	{
-		par: 4,
-		yards: 421,
-		si: 3
-	},
-	{
-		par: 4,
-		yards: 365,
-		si: 13
-	},
-	{
-		par: 3,
-		yards: 162,
-		si: 17
-	},
-	{
-		par: 5,
-		yards: 548,
-		si: 1
-	},
-	{
-		par: 4,
-		yards: 402,
-		si: 11
-	},
-	{
-		par: 4,
-		yards: 430,
-		si: 4
-	},
-	{
-		par: 5,
-		yards: 512,
-		si: 10
-	},
-	{
-		par: 3,
-		yards: 175,
-		si: 16
-	},
-	{
-		par: 4,
-		yards: 387,
-		si: 8
-	},
-	{
-		par: 4,
-		yards: 355,
-		si: 14
-	},
-	{
-		par: 5,
-		yards: 560,
-		si: 2
-	},
-	{
-		par: 3,
-		yards: 198,
-		si: 12
-	},
-	{
-		par: 4,
-		yards: 416,
-		si: 6
-	},
-	{
-		par: 4,
-		yards: 463,
-		si: 18
-	}
+const LBV: Hole[] = [
+  { par: 5, yards: 509, si: 3 },
+  { par: 3, yards: 171, si: 15 },
+  { par: 4, yards: 403, si: 7 },
+  { par: 4, yards: 374, si: 9 },
+  { par: 4, yards: 385, si: 11 },
+  { par: 4, yards: 350, si: 13 },
+  { par: 3, yards: 156, si: 17 },
+  { par: 5, yards: 521, si: 1 },
+  { par: 4, yards: 384, si: 5 },
+  { par: 4, yards: 380, si: 18 },
+  { par: 4, yards: 441, si: 2 },
+  { par: 3, yards: 204, si: 14 },
+  { par: 4, yards: 405, si: 16 },
+  { par: 5, yards: 517, si: 12 },
+  { par: 4, yards: 382, si: 8 },
+  { par: 3, yards: 191, si: 10 },
+  { par: 5, yards: 528, si: 6 },
+  { par: 4, yards: 417, si: 4 },
+];
+const LBV_BLUE: Hole[] = [
+  { par: 5, yards: 495, si: 3 },
+  { par: 3, yards: 159, si: 15 },
+  { par: 4, yards: 377, si: 7 },
+  { par: 4, yards: 364, si: 9 },
+  { par: 4, yards: 372, si: 11 },
+  { par: 4, yards: 339, si: 13 },
+  { par: 3, yards: 128, si: 17 },
+  { par: 5, yards: 508, si: 1 },
+  { par: 4, yards: 372, si: 5 },
+  { par: 4, yards: 368, si: 18 },
+  { par: 4, yards: 429, si: 2 },
+  { par: 3, yards: 189, si: 14 },
+  { par: 4, yards: 340, si: 16 },
+  { par: 5, yards: 501, si: 12 },
+  { par: 4, yards: 357, si: 8 },
+  { par: 3, yards: 177, si: 10 },
+  { par: 5, yards: 513, si: 6 },
+  { par: 4, yards: 401, si: 4 },
 ];
 const MAGNOLIA: Hole[] = [
 	{
@@ -739,9 +687,9 @@ async function insertHoles(sql: Sql, teeId: number, holes: Hole[]) {
       values (${teeId}, ${i + 1}, ${h.par}, ${h.yards}, ${h.si})
     `;
 }
-const globalSeed = globalThis as typeof globalThis & { __ygSeedPromiseV4__?: Promise<void> };
+const globalSeed = globalThis as typeof globalThis & { __ygSeedPromiseV5__?: Promise<void> };
 export async function ensureSeeded(sql: Sql) {
-	globalSeed.__ygSeedPromiseV4__ ??= (async () => {
+	globalSeed.__ygSeedPromiseV5__ ??= (async () => {
 		const existing = await sql<{ id: number }>`select id from trips limit 1`;
 		if (existing.length) {
 			await patchTripSettings(sql);
@@ -750,10 +698,10 @@ export async function ensureSeeded(sql: Sql) {
 		await seed(sql);
 		await patchTripSettings(sql);
 	})().catch((err) => {
-		globalSeed.__ygSeedPromiseV4__ = undefined;
+		globalSeed.__ygSeedPromiseV5__ = undefined;
 		throw err;
 	});
-	await globalSeed.__ygSeedPromiseV4__;
+	await globalSeed.__ygSeedPromiseV5__;
 }
 async function patchTripSettings(sql: Sql) {
 	await sql`
@@ -764,6 +712,7 @@ async function patchTripSettings(sql: Sql) {
   `;
 	await sql`update rounds set allowance_pct = 90 where allowance_pct = 100`;
 	await patchRoster(sql);
+  await patchLakeBuenaVista(sql);
 }
 async function patchRoster(sql: Sql) {
 	await sql`
@@ -809,6 +758,58 @@ async function patchRoster(sql: Sql) {
     where slug = 'addison-shelton' and scouting_report like 'Two handicap%'
   `;
 	await sql`update trips set roster_rev = 1`;
+}
+
+async function patchLakeBuenaVista(sql: Sql) {
+  const [trip] = await sql<{ courses_rev: number }>`select courses_rev from trips order by id limit 1`;
+  if (!trip || trip.courses_rev >= 1) return;
+  const [course] = await sql<{ id: number }>`
+    select id from courses
+    where slug in ('disney-palm', 'disney-lake-buena-vista')
+    order by case when slug = 'disney-palm' then 0 else 1 end
+    limit 1
+  `;
+  if (!course) {
+    await sql`update trips set courses_rev = 1`;
+    return;
+  }
+  await sql`
+    update courses
+    set name = 'Disney’s Lake Buena Vista Golf Course',
+        slug = 'disney-lake-buena-vista',
+        address = '2200 Golf Lake Drive',
+        city = 'Lake Buena Vista, FL 32830',
+        designer = 'Joe Lee',
+        description = 'Country-club layout through the villas. Elevated bunkered greens, an island green on 7, and the morning half of the Disney doubleheader.'
+    where id = ${course.id}
+  `;
+  const tees = await sql<{ id: number; name: string }>`
+    select id, name from tees where course_id = ${course.id}
+  `;
+  for (const tee of tees) {
+    const holes = tee.name === "Blue" ? LBV_BLUE : LBV;
+    const rating = tee.name === "Blue" ? 70.2 : 71.7;
+    const slope = tee.name === "Blue" ? 129 : 133;
+    const yardage = holes.reduce((s, h) => s + h.yards, 0);
+    await sql`
+      update tees
+      set rating = ${rating}, slope = ${slope}, yardage = ${yardage}
+      where id = ${tee.id}
+    `;
+    await sql`delete from holes where tee_id = ${tee.id}`;
+    await insertHoles(sql, tee.id, holes);
+  }
+  await sql`
+    update itinerary_items
+    set title = 'Round 2 — Disney’s Lake Buena Vista'
+    where title ilike '%palm%'
+  `;
+  await sql`
+    update photos
+    set caption = 'Lake Buena Vista. 6:50 AM. Bring a light.'
+    where caption ilike '%palm%'
+  `;
+  await sql`update trips set courses_rev = 1`;
 }
 async function seed(sql: Sql) {
 	const [trip] = await sql<{ id: number }>`
@@ -910,34 +911,31 @@ async function seed(sql: Sql) {
 			}))
 		}]
 	});
-	const palm = await addCourse({
-		name: "Disney’s Palm Golf Course",
-		slug: "disney-palm",
-		address: "1950 W Magnolia Palm Drive",
-		city: "Lake Buena Vista, FL 32830",
-		designer: "Joe Lee / Arnold Palmer Group",
-		image: "/images/palm.jpg",
-		par: 72,
-		theme: "YES. 6:50 AM.",
-		description: "Water on nine holes and a 6:50 AM tee time. Hydration is technically recommended. Consciousness is required.",
-		tees: [{
-			name: "Black",
-			color: "#111111",
-			rating: 73.9,
-			slope: 131,
-			holes: PALM
-		}, {
-			name: "Blue",
-			color: "#1e4b8c",
-			rating: 71.8,
-			slope: 128,
-			holes: PALM.map((h) => ({
-				...h,
-				yards: Math.round(h.yards * .94)
-			}))
-		}]
-	});
-	const magnolia = await addCourse({
+	const lbv = await addCourse({
+    name: "Disney’s Lake Buena Vista Golf Course",
+    slug: "disney-lake-buena-vista",
+    address: "2200 Golf Lake Drive",
+    city: "Lake Buena Vista, FL 32830",
+    designer: "Joe Lee",
+    image: "/images/palm.jpg",
+    par: 72,
+    theme: "YES. 6:50 AM.",
+    description: "Country-club layout through the villas. Elevated bunkered greens, an island green on 7, and the morning half of the Disney doubleheader.",
+    tees: [{
+      name: "Black",
+      color: "#111111",
+      rating: 71.7,
+      slope: 133,
+      holes: LBV
+    }, {
+      name: "Blue",
+      color: "#1e4b8c",
+      rating: 70.2,
+      slope: 129,
+      holes: LBV_BLUE
+    }]
+  });
+  const magnolia = await addCourse({
 		name: "Disney’s Magnolia Golf Course",
 		slug: "disney-magnolia",
 		address: "1950 W Magnolia Palm Drive",
@@ -1033,7 +1031,7 @@ async function seed(sql: Sql) {
 			name: "Round 2",
 			date: "2026-11-13",
 			teeTime: "6:50 AM",
-			course: palm,
+			course: lbv,
 			theme: "YES. 6:50 AM.",
 			notes: "Time until Seth starts texting everyone: insufficient."
 		},
@@ -1103,12 +1101,12 @@ async function seed(sql: Sql) {
 		{
 			day: "2026-11-13",
 			time: "6:50 AM",
-			title: "Round 2 — Disney’s Palm",
+			title: "Round 2 — Disney’s Lake Buena Vista",
 			subtitle: "YES. 6:50 AM.",
 			body: "The Disney Doubleheader begins at an hour that should be illegal. Seth will have been awake for 90 minutes.",
 			kind: "round",
 			round: 1,
-			courseId: palm.courseId,
+			courseId: lbv.courseId,
 			sort: 30
 		},
 		{
@@ -1306,7 +1304,7 @@ async function seed(sql: Sql) {
     values
       (${tripId}, '/images/hero.jpg', 'Florida, whether you are ready or not.', true),
       (${tripId}, '/images/waldorf.jpg', 'Waldorf Astoria — Round 1.', true),
-      (${tripId}, '/images/palm.jpg', 'The Palm. 6:50 AM. Bring a light.', false),
+      (${tripId}, '/images/palm.jpg', 'Lake Buena Vista. 6:50 AM. Bring a light.', false),
       (${tripId}, '/images/magnolia.jpg', 'Magnolia. The long one.', false),
       (${tripId}, '/images/dunes.jpg', 'Southern Dunes. Requested 9:30.', false),
       (${tripId}, '/images/providence.jpg', 'Survival Sunday.', false)

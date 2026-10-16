@@ -38,7 +38,7 @@ const TEE_PRESETS = [
 const COURSE_PHOTOS = [
   { src: "/images/waldorf.jpg", label: "Waldorf" },
   { src: "/images/providence.jpg", label: "Providence" },
-  { src: "/images/palm.jpg", label: "Palm" },
+  { src: "/images/palm.jpg", label: "Lake Buena Vista" },
   { src: "/images/magnolia.jpg", label: "Magnolia" },
   { src: "/images/dunes.jpg", label: "Dunes" },
   { src: "/images/hero.jpg", label: "Clubhouse" },
@@ -297,7 +297,7 @@ function SethCourses() {
         <div className="panel p-5">
           <p className="font-display text-2xl">Pick a course</p>
           <p className="text-sm text-muted">
-            Edit Waldorf, Providence, Palm, Magnolia, or Dunes — or start a sixth card if Seth found
+            Edit Waldorf, Providence, Lake Buena Vista, Magnolia, or Dunes — or start a sixth card if Seth found
             somewhere else to play.
           </p>
         </div>
