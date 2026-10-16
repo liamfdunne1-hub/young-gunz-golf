@@ -687,9 +687,9 @@ async function insertHoles(sql: Sql, teeId: number, holes: Hole[]) {
       values (${teeId}, ${i + 1}, ${h.par}, ${h.yards}, ${h.si})
     `;
 }
-const globalSeed = globalThis as typeof globalThis & { __ygSeedPromiseV6__?: Promise<void> };
+const globalSeed = globalThis as typeof globalThis & { __ygSeedPromiseV7__?: Promise<void> };
 export async function ensureSeeded(sql: Sql) {
-	globalSeed.__ygSeedPromiseV6__ ??= (async () => {
+	globalSeed.__ygSeedPromiseV7__ ??= (async () => {
 		const existing = await sql<{ id: number }>`select id from trips limit 1`;
 		if (existing.length) {
 			await patchTripSettings(sql);
@@ -698,10 +698,10 @@ export async function ensureSeeded(sql: Sql) {
 		await seed(sql);
 		await patchTripSettings(sql);
 	})().catch((err) => {
-		globalSeed.__ygSeedPromiseV6__ = undefined;
+		globalSeed.__ygSeedPromiseV7__ = undefined;
 		throw err;
 	});
-	await globalSeed.__ygSeedPromiseV6__;
+	await globalSeed.__ygSeedPromiseV7__;
 }
 async function patchTripSettings(sql: Sql) {
 	await sql`
@@ -714,6 +714,7 @@ async function patchTripSettings(sql: Sql) {
 	await patchRoster(sql);
   await patchLakeBuenaVista(sql);
   await patchRoundsNotLive(sql);
+  await patchClearScores(sql);
 }
 async function patchRoster(sql: Sql) {
 	await sql`
@@ -822,6 +823,19 @@ async function patchRoundsNotLive(sql: Sql) {
     where status in ('live', 'finalized')
   `;
   await sql`update trips set rounds_rev = 1`;
+}
+
+
+async function patchClearScores(sql: Sql) {
+  const [trip] = await sql<{ scores_rev: number }>`select scores_rev from trips order by id limit 1`;
+  if (!trip || trip.scores_rev >= 1) return;
+  await sql`delete from team_scores`;
+  await sql`delete from scores`;
+  await sql`
+    update matches
+    set status = 'pending', result = null, winner_side = null, holes_up = null, thru = null
+  `;
+  await sql`update trips set scores_rev = 1`;
 }
 
 async function seed(sql: Sql) {
