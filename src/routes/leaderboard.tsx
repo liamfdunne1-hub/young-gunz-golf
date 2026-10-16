@@ -4,17 +4,19 @@ import { BroadcastNav } from "@/components/broadcast-nav";
 import { PlayerAvatar } from "@/components/avatar";
 import { useStats } from "@/lib/hooks";
 import { deriveIntergroup } from "@/lib/golf/teams";
+import { deriveSideFive, sideMargin } from "@/lib/golf/sides";
+import { SIDE_LABEL } from "@/lib/golf/roster";
 import { FORMAT_LABEL } from "@/lib/golf/formats";
 import { formatMoney, playerName } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/leaderboard")({ component: Boards });
 
-const TABS = ["Intergroup", "Match", "Gross", "Net", "Teams", "Birdies"] as const;
+const TABS = ["5v5", "Intergroup", "Match", "Gross", "Net", "Teams", "Birdies"] as const;
 
 function Boards() {
   const { data, stats, skins, teams, isPending } = useStats();
-  const [tab, setTab] = useState<(typeof TABS)[number]>("Match");
+  const [tab, setTab] = useState<(typeof TABS)[number]>("5v5");
   const [roundId, setRoundId] = useState<number | "all">("all");
   if (isPending || !data) return <div className="h-40 animate-pulse rounded-[18px] bg-navy-2" />;
 
@@ -24,6 +26,7 @@ function Boards() {
     (a, b) => (a.combinedNet ?? 999) - (b.combinedNet ?? 999),
   );
   const groupRows = deriveIntergroup(data, teamRoundId ?? 0);
+  const sides = deriveSideFive(data, roundId);
 
   const toPar = (n: number | null) => {
     if (n == null) return "—";
@@ -63,7 +66,55 @@ function Boards() {
         ))}
       </div>
 
-      {tab === "Intergroup" ? (
+      {tab === "5v5" ? (
+        <section className="space-y-3">
+          <p className="text-sm text-muted">
+            Field sides. Each side’s five nets added — lower wins. Tee-time partners stay on Intergroup and Teams.
+          </p>
+          <select
+            className="h-11 w-full rounded-[12px] border border-line bg-navy px-3 sm:w-auto"
+            value={roundId}
+            onChange={(e) => setRoundId(e.target.value === "all" ? "all" : Number(e.target.value))}
+          >
+            <option value="all">All rounds</option>
+            {data.rounds.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+          <div className="panel p-4">
+            <p className="text-[11px] uppercase tracking-[0.16em] text-gold">Net 5v5</p>
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              {sides.map((s) => (
+                <div key={s.side}>
+                  <p className="text-xs uppercase tracking-[0.14em] text-muted">{s.label}</p>
+                  <p className="font-display text-4xl tabular text-gold">{toPar(s.netToPar)}</p>
+                  <p className="text-[11px] text-muted">{s.holes ? `${s.holes} holes` : "No cards"}</p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 font-display text-xl">{sideMargin(sides)}</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {sides.map((s) => (
+              <ol key={s.side} className="panel divide-y divide-line overflow-hidden">
+                <li className="px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-gold">{SIDE_LABEL[s.side]}</li>
+                {s.players.map((row) => {
+                  const p = data.players.find((x) => x.id === row.playerId);
+                  return (
+                    <li key={row.playerId} className="flex min-h-11 items-center gap-3 px-3 py-2">
+                      {p ? <PlayerAvatar player={p} size={28} /> : null}
+                      <span className="flex-1 text-sm">{p ? playerName(p) : "—"}</span>
+                      <span className="text-sm tabular text-cream/90">{toPar(row.netToPar)}</span>
+                    </li>
+                  );
+                })}
+              </ol>
+            ))}
+          </div>
+        </section>
+      ) : tab === "Intergroup" ? (
         <section className="space-y-3">
           <p className="text-sm text-muted">
             Every two-man side, ranked across tee times. Inter-tee matches count. In-tee Vegas does not invent locked partners — those re-form from the landing. Mixed formats rank on net to par; a Vegas-only field ranks on the combined number.
