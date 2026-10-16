@@ -1,4 +1,5 @@
 import type { Sql } from "@/lib/db";
+import { ROSTER, spotOf } from "@/lib/golf/roster";
 import { playingHandicap, courseHandicap } from "@/lib/golf/handicap";
 import { DEFAULT_MATCH_STAKE } from "@/lib/golf/bets";
 import { DEFAULT_SKINS_POT } from "@/lib/golf/skins";
@@ -488,7 +489,7 @@ const PLAYERS: PlayerSeed[] = [
 		email: "seth.young@younggunz.golf",
 		slug: "seth-young",
 		role: "admin",
-		index: 4.1,
+		index: 4.6,
 		tee: "Blue",
 		report: "Trip commissioner. Controls the itinerary, pairings and potentially your access to transportation. Complaining about a ruling is therefore discouraged.",
 		threat: "ADMINISTRATIVE",
@@ -513,7 +514,7 @@ const PLAYERS: PlayerSeed[] = [
 		email: "liam.dunne@younggunz.golf",
 		slug: "liam-dunne",
 		role: "player",
-		index: 7.2,
+		index: 7.5,
 		tee: "Blue",
 		report: "Dangerous combination of enough ability to win and enough volatility to shoot 84 while explaining why every shot was actually pretty good.",
 		threat: "MOOD-DEPENDENT",
@@ -538,7 +539,7 @@ const PLAYERS: PlayerSeed[] = [
 		email: "john.v@younggunz.golf",
 		slug: "john-v",
 		role: "player",
-		index: 6.5,
+		index: 5.2,
 		tee: "Blue",
 		report: "Firmly in the zone where he can beat anyone or spend six holes trying to figure out where his swing went.",
 		threat: "UNPREDICTABLE",
@@ -563,7 +564,7 @@ const PLAYERS: PlayerSeed[] = [
 		email: "kyle.longacre@younggunz.golf",
 		slug: "kyle-longacre",
 		role: "player",
-		index: 5,
+		index: 4.3,
 		tee: "Blue",
 		report: "Single-digit handicap. Almost certainly believes this information should matter more than it does.",
 		threat: "CREDENTIALED",
@@ -588,7 +589,7 @@ const PLAYERS: PlayerSeed[] = [
 		email: "zac.novak@younggunz.golf",
 		slug: "zac-novak",
 		role: "player",
-		index: -1.4,
+		index: -2.2,
 		tee: "Black",
 		report: "Statistically the golfer everyone else wishes had stayed home.",
 		threat: "EXTREMELY ANNOYING",
@@ -613,7 +614,7 @@ const PLAYERS: PlayerSeed[] = [
 		email: "nick.prell@younggunz.golf",
 		slug: "nick-prell",
 		role: "player",
-		index: 2.3,
+		index: 2.1,
 		tee: "Blue",
 		report: "Good enough that nobody wants to give him strokes. Not good enough to stop talking about his handicap.",
 		threat: "PEDANTIC",
@@ -663,7 +664,7 @@ const PLAYERS: PlayerSeed[] = [
 		email: "drew.schneider@younggunz.golf",
 		slug: "drew-schneider",
 		role: "player",
-		index: 1.4,
+		index: 1,
 		tee: "Black",
 		report: "Another low handicap because apparently this trip needed multiple people capable of breaking 75.",
 		threat: "COMPETENT",
@@ -688,9 +689,9 @@ const PLAYERS: PlayerSeed[] = [
 		email: "addison.shelton@younggunz.golf",
 		slug: "addison-shelton",
 		role: "player",
-		index: 2,
+		index: 1.6,
 		tee: "Blue",
-		report: "Two handicap. Terrible news for everyone else.",
+		report: "1.6 index. Terrible news for everyone else.",
 		threat: "QUIETLY LETHAL",
 		metrics: {
 			driving: 84,
@@ -707,13 +708,13 @@ const PLAYERS: PlayerSeed[] = [
 		}
 	},
 	{
-		first: "Julian",
-		last: "Turman",
+		first: "JW",
+		last: "",
 		nickname: "Enough Strokes",
-		email: "julian.turman@younggunz.golf",
-		slug: "julian-turman",
+		email: "jw@younggunz.golf",
+		slug: "jw",
 		role: "player",
-		index: 5.9,
+		index: 6.3,
 		tee: "Blue",
 		report: "Just enough handicap to receive strokes from the good players while still being capable of ruining their day.",
 		threat: "SANDWICHED",
@@ -738,9 +739,9 @@ async function insertHoles(sql: Sql, teeId: number, holes: Hole[]) {
       values (${teeId}, ${i + 1}, ${h.par}, ${h.yards}, ${h.si})
     `;
 }
-const globalSeed = globalThis as typeof globalThis & { __ygSeedPromiseV3__?: Promise<void> };
+const globalSeed = globalThis as typeof globalThis & { __ygSeedPromiseV4__?: Promise<void> };
 export async function ensureSeeded(sql: Sql) {
-	globalSeed.__ygSeedPromiseV3__ ??= (async () => {
+	globalSeed.__ygSeedPromiseV4__ ??= (async () => {
 		const existing = await sql<{ id: number }>`select id from trips limit 1`;
 		if (existing.length) {
 			await patchTripSettings(sql);
@@ -749,10 +750,10 @@ export async function ensureSeeded(sql: Sql) {
 		await seed(sql);
 		await patchTripSettings(sql);
 	})().catch((err) => {
-		globalSeed.__ygSeedPromiseV3__ = undefined;
+		globalSeed.__ygSeedPromiseV4__ = undefined;
 		throw err;
 	});
-	await globalSeed.__ygSeedPromiseV3__;
+	await globalSeed.__ygSeedPromiseV4__;
 }
 async function patchTripSettings(sql: Sql) {
 	await sql`
@@ -762,6 +763,52 @@ async function patchTripSettings(sql: Sql) {
         skins_pot = coalesce(skins_pot, ${DEFAULT_SKINS_POT})
   `;
 	await sql`update rounds set allowance_pct = 90 where allowance_pct = 100`;
+	await patchRoster(sql);
+}
+async function patchRoster(sql: Sql) {
+	await sql`
+    update players
+    set first_name = 'JW',
+        last_name = '',
+        slug = 'jw',
+        email = case
+          when lower(email) = 'julian.turman@younggunz.golf' then 'jw@younggunz.golf'
+          else email
+        end
+    where slug = 'julian-turman'
+      and not exists (select 1 from players where slug = 'jw')
+  `;
+	await sql`
+    update market_selections ms
+    set label = 'JW'
+    from players p
+    where ms.player_id = p.id and p.slug = 'jw' and ms.label ilike 'julian%'
+  `;
+	const [trip] = await sql<{ roster_rev: number }>`select roster_rev from trips order by id limit 1`;
+	if (!trip || trip.roster_rev >= 1) {
+		for (const spot of ROSTER) {
+			await sql`update players set side = ${spot.side} where slug = ${spot.slug} and side is null`;
+		}
+		return;
+	}
+	for (const spot of ROSTER) {
+		const ch = courseHandicap(spot.index, 131, 72.9, 72);
+		const ph = playingHandicap(ch);
+		await sql`
+      update players
+      set handicap_index = ${spot.index},
+          course_handicap = ${ch},
+          playing_handicap = ${ph},
+          side = ${spot.side}
+      where slug = ${spot.slug}
+    `;
+	}
+	await sql`
+    update players
+    set scouting_report = '1.6 index. Terrible news for everyone else.'
+    where slug = 'addison-shelton' and scouting_report like 'Two handicap%'
+  `;
+	await sql`update trips set roster_rev = 1`;
 }
 async function seed(sql: Sql) {
 	const [trip] = await sql<{ id: number }>`
@@ -780,18 +827,20 @@ async function seed(sql: Sql) {
 	const tripId = trip.id;
 	const playerIds: Record<string, number> = {};
 	for (const p of PLAYERS) {
-		const ch = courseHandicap(p.index, 131, 72.9, 72);
+		const listed = spotOf(p.slug);
+		const index = listed?.index ?? p.index;
+		const ch = courseHandicap(index, 131, 72.9, 72);
 		const ph = playingHandicap(ch);
 		const [row] = await sql<{ id: number }>`
       insert into players (
         trip_id, first_name, last_name, nickname, email, slug, role,
         handicap_index, course_handicap, playing_handicap, tee_name,
-        scouting_report, threat_level, joke_metrics, invite_token, invited_at
+        scouting_report, threat_level, joke_metrics, invite_token, invited_at, side
       ) values (
         ${tripId}, ${p.first}, ${p.last}, ${p.nickname}, ${p.email}, ${p.slug}, ${p.role},
-        ${p.index}, ${ch}, ${ph}, ${p.tee},
+        ${index}, ${ch}, ${ph}, ${p.tee},
         ${p.report}, ${p.threat}, ${JSON.stringify(p.metrics)}::jsonb,
-        ${crypto.randomUUID()}, now()
+        ${crypto.randomUUID()}, now(), ${listed?.side ?? null}
       )
       returning id
     `;
@@ -1160,7 +1209,7 @@ async function seed(sql: Sql) {
 	]) {
 		for (const p of PLAYERS) await sql`
         insert into market_selections (market_id, label, player_id)
-        values (${marketId}, ${`${p.first} ${p.last}`}, ${playerIds[p.slug]})
+        values (${marketId}, ${`${p.first} ${p.last}`.trim()}, ${playerIds[p.slug]})
       `;
 		await sql`
       insert into market_selections (market_id, label, player_id)

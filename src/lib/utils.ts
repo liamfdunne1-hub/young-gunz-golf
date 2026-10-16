@@ -29,7 +29,10 @@ export function playerName(p: { first_name: string; last_name: string }): string
 }
 
 export function initials(p: { first_name: string; last_name: string }): string {
-  return `${p.first_name[0] ?? ""}${p.last_name[0] ?? ""}`.toUpperCase();
+  const first = p.first_name.trim();
+  const last = p.last_name.trim();
+  if (!last) return first.slice(0, 2).toUpperCase();
+  return `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
 }
 
 export function formatMoney(amount: number): string {

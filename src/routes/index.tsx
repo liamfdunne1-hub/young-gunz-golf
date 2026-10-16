@@ -7,6 +7,7 @@ import { ACTION_TICKER, PRIMARY_TAGLINE, SECONDARY_TAGLINES, SETH_TITLES } from 
 import { useMeQuery, useStats } from "@/lib/hooks";
 import { useGuestMode } from "@/lib/guest";
 import { formatHandicap, playerName } from "@/lib/utils";
+import { SIDE_LABEL, playersOnSide, type Side } from "@/lib/golf/roster";
 import { FORMAT_LABEL, asFormat, teeLabel } from "@/lib/golf/formats";
 
 export const Route = createFileRoute("/")({ component: Home });
@@ -171,18 +172,31 @@ function Home() {
 
       <section>
         <div className="mb-3 flex items-end justify-between">
-          <h2 className="font-display text-3xl">The Field</h2>
+          <h2 className="font-display text-3xl">5 v 5</h2>
           <Link to="/players" className="text-xs uppercase tracking-[0.16em] text-gold">
             Full profiles
           </Link>
         </div>
-        <div className="flex gap-3 overflow-x-auto pb-2">
-          {data.players.map((p) => (
-            <Link key={p.id} to="/players/$slug" params={{ slug: p.slug }} className="panel min-w-[148px] p-3">
-              <PlayerAvatar player={p} size={44} />
-              <p className="mt-2 text-sm">{playerName(p)}</p>
-              <p className="text-[11px] text-gold">{formatHandicap(p.handicap_index)}</p>
-            </Link>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {(["a", "b"] as Side[]).map((side) => (
+            <div key={side} className="panel p-3">
+              <p className="text-[11px] uppercase tracking-[0.16em] text-gold">{SIDE_LABEL[side]}</p>
+              <ul className="mt-1">
+                {playersOnSide(data.players, side).map((p) => (
+                  <li key={p.id}>
+                    <Link
+                      to="/players/$slug"
+                      params={{ slug: p.slug }}
+                      className="flex min-h-11 items-center gap-3 py-1.5"
+                    >
+                      <PlayerAvatar player={p} size={32} />
+                      <span className="flex-1 text-sm">{playerName(p)}</span>
+                      <span className="text-sm tabular text-gold">{formatHandicap(p.handicap_index)}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
         </div>
       </section>

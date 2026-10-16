@@ -3,6 +3,7 @@ import { PlayerAvatar } from "@/components/avatar";
 import { metricLabels } from "@/lib/golf/derive";
 import { useStats } from "@/lib/hooks";
 import { formatCourseHcp, formatHandicap, playerName } from "@/lib/utils";
+import { SIDE_LABEL } from "@/lib/golf/roster";
 import { SETH_TITLES } from "@/lib/constants";
 
 export const Route = createFileRoute("/players/$slug")({ component: Profile });
@@ -24,6 +25,9 @@ function Profile() {
           <h1 className="font-display text-4xl leading-tight">{playerName(p)}</h1>
           {isSeth ? (
             <p className="text-sm text-gold">{SETH_TITLES.join(" · ")}</p>
+          ) : null}
+          {p.side ? (
+            <p className="mt-1 text-xs uppercase tracking-[0.16em] text-gold">{SIDE_LABEL[p.side]}</p>
           ) : null}
           {p.threat_level ? (
             <p className="mt-1 text-xs uppercase tracking-[0.16em] text-orange">Threat: {p.threat_level}</p>

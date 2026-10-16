@@ -47,6 +47,7 @@ export type PlayerRow = {
   handicap_index: string | number;
   course_handicap: number | null;
   playing_handicap: number | null;
+  side: string | null;
   tee_name: string;
   scouting_report: string;
   threat_level: string | null;
@@ -67,6 +68,7 @@ export function mapPlayer(row: PlayerRow): Player {
     handicap_index: num(row.handicap_index),
     course_handicap: row.course_handicap,
     playing_handicap: row.playing_handicap,
+    side: row.side === "a" || row.side === "b" ? row.side : null,
     tee_name: row.tee_name,
     scouting_report: row.scouting_report,
     threat_level: row.threat_level,

@@ -1,5 +1,5 @@
 import { deriveStats, type Bootstrap, type PlayerStats } from "@/lib/golf/derive";
-import { playerName } from "@/lib/utils";
+import { formatHandicap, playerName } from "@/lib/utils";
 
 export type AwardPick = {
   name: string;
@@ -165,7 +165,7 @@ export function pickAwards(data: Bootstrap): AwardPick[] {
       "For the player who still thinks this is a big deal.",
       "fun",
       byHcp[0].id,
-      `Lowest index: ${byHcp[0].handicap_index}`,
+      `Lowest index: ${formatHandicap(byHcp[0].handicap_index)}`,
       false,
     );
   }
@@ -176,7 +176,7 @@ export function pickAwards(data: Bootstrap): AwardPick[] {
       "Earliest bedtime. Loudest knees.",
       "fun",
       old.id,
-      `Highest index: ${old.handicap_index}`,
+      `Highest index: ${formatHandicap(old.handicap_index)}`,
       false,
     );
   }

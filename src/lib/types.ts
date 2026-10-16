@@ -26,6 +26,7 @@ export type Player = {
   handicap_index: number;
   course_handicap: number | null;
   playing_handicap: number | null;
+  side: "a" | "b" | null;
   tee_name: string;
   scouting_report: string;
   threat_level: string | null;

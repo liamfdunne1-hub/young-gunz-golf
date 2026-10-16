@@ -8,6 +8,7 @@ import { Input, Label } from "@/components/ui/input";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { formatHandicap, isPlaceholderEmail, playerName } from "@/lib/utils";
+import { SIDE_LABEL, playersOnSide } from "@/lib/golf/roster";
 import { useState } from "react";
 import type { Player } from "@/lib/types";
 
@@ -73,7 +74,15 @@ function SethPlayers() {
       <p className="text-xs uppercase tracking-[0.16em] text-gold">
         {trip.data.players.length} golfers
       </p>
-      {trip.data.players.map((p) => (
+      {(() => {
+        const sided = [
+          ...playersOnSide(trip.data.players, "a"),
+          ...playersOnSide(trip.data.players, "b"),
+        ];
+        const seen = new Set(sided.map((p) => p.id));
+        const rest = trip.data.players.filter((p) => !seen.has(p.id));
+        return [...sided, ...rest];
+      })().map((p) => (
         <Editor key={p.id} player={p} onChanged={() => qc.invalidateQueries({ queryKey: ["trip"] })} />
       ))}
     </div>
@@ -122,6 +131,7 @@ function Editor({ player, onChanged }: { player: Player; onChanged: () => void }
         <div className="min-w-0">
           <p className="font-display text-2xl text-cream">{playerName(player)}</p>
           <p className="truncate text-xs text-muted">
+            {player.side ? `${SIDE_LABEL[player.side]} · ` : ""}
             {claimed ? "Claimed" : "Open"} · {emailLabel} · index {formatHandicap(player.handicap_index)}
           </p>
         </div>
