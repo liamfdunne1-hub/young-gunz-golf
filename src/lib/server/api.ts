@@ -274,7 +274,8 @@ export const enterScore = createServerFn({ method: "POST" })
       select status, finalized_at from rounds where id = ${data.roundId}
     `;
     if (!round) throw new Error("Round not found");
-    if (round.finalized_at) throw new Error("This round is locked.");
+    if (round.finalized_at || round.status === "finalized") throw new Error("This round is locked.");
+    if (round.status !== "live") throw new Error("Seth has not started this round.");
     if (me.role !== "admin" && me.id !== data.playerId) {
       const sameGroup = await sql<{ n: number }>`
         select count(*)::int as n
@@ -299,9 +300,6 @@ export const enterScore = createServerFn({ method: "POST" })
       if ((sameGroup[0]?.n ?? 0) === 0 && (sameMatch[0]?.n ?? 0) === 0) {
         throw new Error("You can only score your group.");
       }
-    }
-    if (round.status === "upcoming") {
-      await sql`update rounds set status = 'live' where id = ${data.roundId}`;
     }
     const saved = await saveGross(sql, data.roundId, data.playerId, data.hole, data.gross);
     return saved;
@@ -695,6 +693,12 @@ export const enterTeamScore = createServerFn({ method: "POST" })
     if (!match) throw new Error("Match not found");
     const ids = [match.a1, match.a2, match.b1, match.b2];
     if (me.role !== "admin" && !ids.includes(me.id)) throw new Error("Not your match.");
+    const [round] = await sql<{ status: string; finalized_at: string | null }>`
+      select status, finalized_at from rounds where id = ${data.roundId}
+    `;
+    if (!round) throw new Error("Round not found");
+    if (round.finalized_at || round.status === "finalized") throw new Error("This round is locked.");
+    if (round.status !== "live") throw new Error("Seth has not started this round.");
     return saveTeamGross(sql, data.roundId, data.matchId, data.side, data.hole, data.gross);
   });
 

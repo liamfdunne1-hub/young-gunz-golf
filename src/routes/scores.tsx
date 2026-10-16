@@ -142,7 +142,10 @@ function Scores() {
   const match = groupMatch ?? interMatch;
 
   function postScore(playerId: number, gross: number) {
-    if (!roundId) return;
+    if (!roundId || round?.status !== "live") {
+      toast.error("Seth has not started this round.");
+      return;
+    }
     const payload = { roundId, playerId, hole, gross };
     mut.mutate(payload, {
       onError: () => {
@@ -165,6 +168,7 @@ function Scores() {
 
   const sideName = (id: number) => data.players.find((p) => p.id === id)?.first_name ?? "";
   const myPlayer = meId ? data.players.find((p) => p.id === meId) : null;
+  const scoringOpen = round.status === "live";
   const canSelf = Boolean(meId);
   const editableIds =
     resolvedMode === "me" && meId
@@ -250,6 +254,18 @@ function Scores() {
           ))}
         </select>
       </header>
+      {scoringOpen ? null : (
+        <div className="panel p-4">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-gold">
+            {round.status === "finalized" ? "Locked" : "Not started"}
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            {round.status === "finalized"
+              ? "This round is finalized. No more scores."
+              : "Seth has to start the round before anyone can post a score."}
+          </p>
+        </div>
+      )}
 
       <div className="flex gap-2">
         {(
@@ -451,6 +467,7 @@ function Scores() {
                 const lines = data.teamScores.filter((t) => t.match_id === teamMatch.id && t.side === side);
                 const posted = lines.find((t) => t.hole_number === hole)?.gross ?? null;
                 const canEdit =
+                  scoringOpen &&
                   meId != null &&
                   (Boolean(me.data?.isAdmin) || pair.includes(meId) || groupPlayerIds.includes(meId));
                 return (
@@ -538,6 +555,7 @@ function Scores() {
             const gTot = mine.reduce((n, s) => n + s.gross, 0);
             const nTot = mine.reduce((n, s) => n + s.net, 0);
             const canEdit =
+              scoringOpen &&
               !isTeamFormat(format) &&
               Boolean(meId) &&
               (me.data?.isAdmin || pid === meId || groupPlayerIds.includes(pid));
