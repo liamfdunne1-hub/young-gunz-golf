@@ -1,10 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useTrip } from "@/lib/hooks";
+import { useQuery } from "@tanstack/react-query";
+import { useTrip, useMeQuery } from "@/lib/hooks";
+import { getHouse } from "@/lib/server/api";
 
 export const Route = createFileRoute("/itinerary")({ component: Itinerary });
 
 function Itinerary() {
   const { data, isPending } = useTrip();
+  const me = useMeQuery();
+  const claimed = Boolean(me.data?.player);
+  const house = useQuery({
+    queryKey: ["house", me.data?.player?.id],
+    queryFn: () => getHouse(),
+    enabled: claimed,
+  });
   if (isPending || !data) return <div className="h-40 animate-pulse rounded-[18px] bg-navy-2" />;
 
   const days = [...new Set(data.itinerary.map((i) => i.day))];
@@ -15,6 +24,7 @@ function Itinerary() {
         <h1 className="font-display text-4xl">The Itinerary</h1>
         <p className="text-sm text-muted">This is the document. The group chat is not the document.</p>
       </header>
+      <HouseCard claimed={claimed} signedIn={Boolean(me.authUser)} house={house.data} />
       {data.announcements.length ? (
         <section className="panel p-4">
           <p className="text-[11px] uppercase tracking-[0.2em] text-gold">Mom’s Bulletin Board</p>
@@ -73,5 +83,72 @@ function Itinerary() {
         );
       })}
     </div>
+  );
+}
+
+function HouseCard({
+  claimed,
+  signedIn,
+  house,
+}: {
+  claimed: boolean;
+  signedIn: boolean;
+  house?: {
+    property: string;
+    name: string;
+    address: string;
+    city: string;
+    maps: string;
+    wifi: { name: string; password: string };
+  };
+}) {
+  if (!claimed || !house) {
+    return (
+      <section className="panel p-4">
+        <p className="text-[11px] uppercase tracking-[0.2em] text-gold">The house</p>
+        <p className="mt-2 text-sm text-muted">
+          Address and Wi-Fi are for the field only.{" "}
+          {signedIn ? (
+            <Link to="/locker" className="text-gold">
+              Claim a bag
+            </Link>
+          ) : (
+            <Link to="/login" className="text-gold">
+              Sign in and claim a bag
+            </Link>
+          )}{" "}
+          to see them.
+        </p>
+      </section>
+    );
+  }
+  return (
+    <section className="panel p-4">
+      <p className="text-[11px] uppercase tracking-[0.2em] text-gold">The house</p>
+      <h2 className="mt-1 font-display text-2xl">{house.name}</h2>
+      <p className="text-sm text-cream/80">{house.property}</p>
+      <a href={house.maps} target="_blank" rel="noreferrer" className="mt-2 block text-sm text-gold">
+        {house.address}
+        <br />
+        {house.city}
+      </a>
+      <div className="mt-4 space-y-1">
+        <p className="text-[11px] uppercase tracking-[0.16em] text-gold">Wi-Fi</p>
+        <p className="text-sm">
+          <span className="text-muted">Network</span> {house.wifi.name}
+        </p>
+        <p className="flex items-center gap-3 text-sm">
+          <span className="text-muted">Password</span>
+          <span className="tabular">{house.wifi.password}</span>
+          <button
+            type="button"
+            className="text-xs uppercase tracking-[0.12em] text-gold"
+            onClick={() => void navigator.clipboard?.writeText(house.wifi.password)}
+          >
+            Copy
+          </button>
+        </p>
+      </div>
+    </section>
   );
 }

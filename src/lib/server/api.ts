@@ -156,6 +156,23 @@ export const getMe = createServerFn({ method: "GET" })
     };
   });
 
+export const getHouse = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const sql = await withDb();
+    const ident = await userEmail(sql, context.userId);
+    const player = await playerByUser(sql, context.userId, ident.email);
+    if (!player) throw new Error("Claim a bag first.");
+    return {
+      property: "W410 - The Gorgeous Golf-View Villa",
+      name: "The Gorgeous Golf-View Villa",
+      address: "311 Muirfield Loop",
+      city: "Kissimmee, FL 34747",
+      maps: "https://maps.google.com/?q=311+Muirfield+Loop,+Kissimmee,+FL+34747",
+      wifi: { name: "Centurylink3144", password: "ck4ndac3ax8866" },
+    };
+  });
+
 export const getDraftPairings = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .validator(z.object({ roundId: z.number() }))
