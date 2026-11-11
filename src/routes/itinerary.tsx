@@ -8,11 +8,12 @@ export const Route = createFileRoute("/itinerary")({ component: Itinerary });
 function Itinerary() {
   const { data, isPending } = useTrip();
   const me = useMeQuery();
+  const signedIn = Boolean(me.authUser);
   const claimed = Boolean(me.data?.player);
   const house = useQuery({
-    queryKey: ["house", me.data?.player?.id],
+    queryKey: ["house", me.authUser?.id ?? "anon"],
     queryFn: () => getHouse(),
-    enabled: claimed,
+    enabled: signedIn,
   });
   if (isPending || !data) return <div className="h-40 animate-pulse rounded-[18px] bg-navy-2" />;
 
@@ -24,7 +25,7 @@ function Itinerary() {
         <h1 className="font-display text-4xl">The Itinerary</h1>
         <p className="text-sm text-muted">This is the document. The group chat is not the document.</p>
       </header>
-      <HouseCard claimed={claimed} signedIn={Boolean(me.authUser)} house={house.data} />
+      <HouseCard signedIn={signedIn} house={house.data} />
       {data.announcements.length ? (
         <section className="panel p-4">
           <p className="text-[11px] uppercase tracking-[0.2em] text-gold">Mom’s Bulletin Board</p>
@@ -87,11 +88,9 @@ function Itinerary() {
 }
 
 function HouseCard({
-  claimed,
   signedIn,
   house,
 }: {
-  claimed: boolean;
   signedIn: boolean;
   house?: {
     property: string;
@@ -103,21 +102,15 @@ function HouseCard({
     code: string;
   };
 }) {
-  if (!claimed || !house) {
+  if (!signedIn || !house) {
     return (
       <section className="panel p-4">
         <p className="text-[11px] uppercase tracking-[0.2em] text-gold">The house</p>
         <p className="mt-2 text-sm text-muted">
-          Address, Wi-Fi, and door code are for the field only.{" "}
-          {signedIn ? (
-            <Link to="/locker" className="text-gold">
-              Claim a bag
-            </Link>
-          ) : (
-            <Link to="/login" className="text-gold">
-              Sign in and claim a bag
-            </Link>
-          )}{" "}
+          Address, door code, and Wi-Fi are for signed-in players only.{" "}
+          <Link to="/login" className="text-gold">
+            Sign in
+          </Link>{" "}
           to see them.
         </p>
       </section>

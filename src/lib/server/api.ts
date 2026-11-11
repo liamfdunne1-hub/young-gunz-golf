@@ -159,10 +159,6 @@ export const getMe = createServerFn({ method: "GET" })
 export const getHouse = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
-    const sql = await withDb();
-    const ident = await userEmail(sql, context.userId);
-    const player = await playerByUser(sql, context.userId, ident.email);
-    if (!player) throw new Error("Claim a bag first.");
     return {
       property: "W410 - The Gorgeous Golf-View Villa",
       name: "The Gorgeous Golf-View Villa",
