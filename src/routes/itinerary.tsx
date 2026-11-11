@@ -100,6 +100,7 @@ function HouseCard({
     city: string;
     maps: string;
     wifi: { name: string; password: string };
+    code: string;
   };
 }) {
   if (!claimed || !house) {
@@ -107,7 +108,7 @@ function HouseCard({
       <section className="panel p-4">
         <p className="text-[11px] uppercase tracking-[0.2em] text-gold">The house</p>
         <p className="mt-2 text-sm text-muted">
-          Address and Wi-Fi are for the field only.{" "}
+          Address, Wi-Fi, and door code are for the field only.{" "}
           {signedIn ? (
             <Link to="/locker" className="text-gold">
               Claim a bag
@@ -132,6 +133,19 @@ function HouseCard({
         <br />
         {house.city}
       </a>
+      <div className="mt-4 space-y-1">
+        <p className="text-[11px] uppercase tracking-[0.16em] text-gold">Door code</p>
+        <p className="flex items-center gap-3 text-sm">
+          <span className="tabular text-lg">{house.code}</span>
+          <button
+            type="button"
+            className="text-xs uppercase tracking-[0.12em] text-gold"
+            onClick={() => void navigator.clipboard?.writeText(house.code)}
+          >
+            Copy
+          </button>
+        </p>
+      </div>
       <div className="mt-4 space-y-1">
         <p className="text-[11px] uppercase tracking-[0.16em] text-gold">Wi-Fi</p>
         <p className="text-sm">
