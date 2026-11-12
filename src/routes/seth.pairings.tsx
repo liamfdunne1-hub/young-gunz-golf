@@ -85,14 +85,17 @@ function SethPairings() {
     enabled: Boolean(me.data?.isAdmin),
   });
 
+  const [syncedRound, setSyncedRound] = useState<number | null>(null);
+
   useEffect(() => {
-    if (!q.data) return;
+    if (!q.data || !roundId || syncedRound === roundId) return;
     const next: Record<number, number[]> = {};
     for (const g of q.data.groups) {
       next[g.id] = q.data.groupPlayers.filter((gp) => gp.group_id === g.id).map((gp) => gp.player_id);
     }
     setDraft(next);
-  }, [q.data]);
+    setSyncedRound(roundId);
+  }, [q.data, roundId, syncedRound]);
 
   const assigned = useMemo(() => new Set(Object.values(draft).flat()), [draft]);
   const bench = (trip.data?.players ?? []).filter((p) => !assigned.has(p.id));
@@ -109,6 +112,7 @@ function SethPairings() {
         },
       }),
     onSuccess: (res) => {
+      setSyncedRound(null);
       qc.invalidateQueries({ queryKey: ["draft"] });
       toast(res.message);
     },
@@ -225,6 +229,7 @@ function SethPairings() {
           onShuffle={() => setConfirm("rand")}
           onCopy={() =>
             copyPrevPairings({ data: { roundId } }).then(() => {
+              setSyncedRound(null);
               qc.invalidateQueries({ queryKey: ["draft"] });
               toast("Copied last round’s tee times.");
             })
@@ -288,6 +293,7 @@ function SethPairings() {
                       const shape = asShape(q.data?.groupShape);
                       const res = await randomizePairings({ data: { roundId, shape } });
                       toast(res.message);
+                      setSyncedRound(null);
                       qc.invalidateQueries({ queryKey: ["draft"] });
                     } else {
                       await save.mutateAsync();
