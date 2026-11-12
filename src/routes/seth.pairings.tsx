@@ -1,1 +1,1 @@
-$(cat /tmp/seth.pairings.tsx)
+PLACEHOLDER_WILL_BE_REPLACED
